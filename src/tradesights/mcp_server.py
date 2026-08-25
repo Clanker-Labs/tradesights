@@ -33,6 +33,21 @@ from tradesights.universe import LIQUID, SECTORS
 HOST = os.environ.get("MCP_HOST", "0.0.0.0")
 PORT = int(os.environ.get("TRADESIGHTS_MCP_PORT", "8094"))
 
+#: Where the digest belongs. Market talk in the market channel -- the general
+#: chat is where everything else already lands, and a daily wall of tickers in
+#: it is how a useful report becomes something people mute.
+#:
+#: Returned to the caller rather than posted from here. LeClanker owns the bot
+#: token and every other outbound message; this server formats and it does not
+#: deliver.
+#
+#: `or` rather than a get() default: compose passes
+#: `TRADESIGHTS_TELEGRAM_CHAT: ${TRADESIGHTS_TELEGRAM_CHAT:-}`, which sets the
+#: variable to the EMPTY STRING when it is absent from the env file. An empty
+#: variable is a set variable, so the second argument to get() never runs and
+#: the digest came back with nowhere to go.
+TELEGRAM_CHAT = os.environ.get("TRADESIGHTS_TELEGRAM_CHAT") or "-1004498770577"
+
 mcp = FastMCP(
     "tradesights",
     instructions=(
@@ -94,6 +109,7 @@ def tradesights_digest(limit: int = 5) -> dict:
         "ok": True,
         "regime": regime,
         "message": "\n".join(lines),
+        "post_to": TELEGRAM_CHAT,
         "names": [
             {"symbol": r.symbol, "quadrant": r.quadrant.value,
              "reading": QUADRANT_PLAIN[r.quadrant], "rel_1m": round(r.rel_1m, 4),

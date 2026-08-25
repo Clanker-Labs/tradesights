@@ -36,6 +36,11 @@ and your training data does not.
 It was composed to be read on a phone at seven in the morning; rewriting it in
 your own words reliably makes it longer, and the numbers are exact.
 
+It also returns `post_to` — the chat this belongs in. **Send it there, not to
+the default chat.** Market talk goes in the market channel; a daily wall of
+tickers in the general chat is how a useful report becomes something people
+mute.
+
 ## The four situations
 
 Crossing price against positioning puts a name in one of four boxes:
