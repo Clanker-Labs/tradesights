@@ -1,0 +1,22 @@
+[Unit]
+Description=Record today's tradesights scan into the archive
+Documentation=https://clanker-labs.github.io/tradesights/
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=jarvis
+Group=jarvis
+WorkingDirectory=/home/jarvis/apps/tradesights
+# The archive is the whole point and it only grows forward: a session missed is
+# a session that can never be recovered, because option chains are not
+# retrievable after the fact. Retry rather than shrug.
+ExecStart=/home/jarvis/apps/tradesights/.venv/bin/python -m tradesights.cli snapshot
+Restart=on-failure
+RestartSec=15min
+# Three attempts spread over the afternoon, then give up until tomorrow. Yahoo
+# is scraped rather than licensed and has bad hours; it usually has good ones an
+# hour later.
+StartLimitBurst=3
+Nice=10

@@ -43,6 +43,13 @@ class PriceLayer:
     ret_1m: float          # total return over ~1 month
     rel_1m: float          # that return minus the benchmark's
     avg_volume: float
+    #: The close this reading was taken against.
+    #:
+    #: Carried so a stored snapshot can be scored later. Without it a saved scan
+    #: records only that a name looked stretched, never whether it then went
+    #: anywhere -- which is the only question that would make the archive worth
+    #: keeping. Zero when the download did not give one.
+    last: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -144,6 +151,12 @@ def fetch_prices(symbols: list[str], benchmark: str = "SPY") -> dict[str, PriceL
     closes = raw["Close"] if "Close" in raw else raw  # noqa: SIM401
     volumes = raw["Volume"] if "Volume" in raw else None  # noqa: SIM401
 
+    def last_close(sym: str) -> float:
+        if sym not in closes:
+            return 0.0
+        series = closes[sym].dropna()
+        return float(series.iloc[-1]) if len(series) else 0.0
+
     def total_return(sym: str) -> float | None:
         if sym not in closes:
             return None
@@ -167,7 +180,8 @@ def fetch_prices(symbols: list[str], benchmark: str = "SPY") -> dict[str, PriceL
         avg_vol = 0.0
         if volumes is not None and sym in volumes:
             avg_vol = float(volumes[sym].dropna().tail(21).mean() or 0.0)
-        out[sym] = PriceLayer(symbol=sym, ret_1m=ret, rel_1m=ret - bench, avg_volume=avg_vol)
+        out[sym] = PriceLayer(symbol=sym, ret_1m=ret, rel_1m=ret - bench,
+                              avg_volume=avg_vol, last=last_close(sym))
     return out
 
 

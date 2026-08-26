@@ -1,0 +1,542 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>tradesights</title>
+<style>
+:root{
+  --bg:#101211; --raised:#181b19; --sunken:#0c0e0d; --line:#272b28;
+  --heading:#e9ebe7; --body:#a9aea8; --muted:#7e847e; --faint:#636963;
+  --accent:#e79a4b; --accent-soft:rgba(231,154,75,.08);
+  --up:#6fbf8b; --warn:#e0b341; --down:#d4695f;
+  --display:"Archivo",ui-sans-serif,system-ui,sans-serif;
+  --label:"Archivo Narrow","Archivo",ui-sans-serif,sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,"SF Mono",monospace;
+  --swift:cubic-bezier(.645,.045,.355,1);
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--body);font-family:var(--display);
+  font-size:15px;line-height:1.55;-webkit-font-smoothing:antialiased}
+h1,h2,h3{color:var(--heading);font-weight:600;margin:0}
+button,input,select{font-family:inherit}
+.wrap{max-width:1440px;margin:0 auto;padding:22px 20px 70px}
+
+header{display:flex;align-items:center;gap:14px;padding-bottom:16px;
+  border-bottom:1px solid var(--line);margin-bottom:18px;flex-wrap:wrap}
+.brand{font-family:var(--label);font-size:22px;color:var(--heading)}
+.sp{flex:1}
+.tag{font-family:var(--label);font-size:11px;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--muted);border:1px solid var(--line);border-radius:3px;padding:3px 8px}
+.tag.safe{color:var(--up);border-color:rgba(111,191,139,.35)}
+select{background:var(--bg);border:1px solid var(--line);border-radius:3px;
+  color:var(--heading);font-family:var(--mono);font-size:12.5px;padding:5px 8px}
+select:focus{outline:none;border-color:var(--accent)}
+
+nav.tabs{display:flex;gap:2px;border-bottom:1px solid var(--line);margin-bottom:18px;
+  overflow-x:auto}
+nav.tabs button{background:none;color:var(--muted);border:0;border-bottom:2px solid transparent;
+  cursor:pointer;padding:9px 16px;font-family:var(--label);font-size:12px;
+  letter-spacing:.08em;text-transform:uppercase;white-space:nowrap}
+nav.tabs button:hover{color:var(--heading)}
+nav.tabs button.on{color:var(--accent);border-bottom-color:var(--accent)}
+
+.panel{background:var(--raised);border:1px solid var(--line);border-radius:5px;
+  padding:18px 20px;margin-bottom:18px}
+.panel h2{font-size:13px;font-family:var(--label);letter-spacing:.08em;
+  text-transform:uppercase;color:var(--muted);margin-bottom:4px}
+.panel p.hint{font-size:13px;color:var(--faint);margin:0 0 14px;max-width:78ch;line-height:1.5}
+.split{display:grid;grid-template-columns:1fr 380px;gap:18px;align-items:start}
+@media (max-width:1080px){.split{grid-template-columns:1fr}}
+
+.chips{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:14px}
+.chip{font-family:var(--label);font-size:11px;letter-spacing:.05em;text-transform:uppercase;
+  border:1px solid var(--line);border-radius:3px;padding:4px 10px;cursor:pointer;
+  color:var(--muted);background:none;transition:all .16s var(--swift)}
+.chip:hover{color:var(--heading)}
+.chip.on{border-color:currentColor}
+.chip .n{opacity:.6;margin-left:5px}
+
+#plot{width:100%;height:auto;display:block;cursor:crosshair}
+#plot circle{transition:r .12s var(--swift)}
+.tip{position:fixed;pointer-events:none;background:var(--sunken);border:1px solid var(--line);
+  border-radius:4px;padding:9px 12px;font-family:var(--mono);font-size:12px;
+  color:var(--body);z-index:40;opacity:0;transition:opacity .12s;max-width:280px;
+  line-height:1.5;box-shadow:0 6px 18px rgba(0,0,0,.5)}
+.tip.on{opacity:1}
+.tip .s{color:var(--heading);font-size:13px}
+
+table{border-collapse:collapse;width:100%;font-family:var(--mono);font-size:12.5px;
+  min-width:520px}
+th{font-family:var(--label);font-size:10px;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--muted);text-align:left;font-weight:400;padding:7px 10px;
+  border-bottom:1px solid var(--line);white-space:nowrap;cursor:pointer;user-select:none}
+th:hover{color:var(--heading)}
+th.r,td.r{text-align:right}
+td{padding:7px 10px;border-bottom:1px solid rgba(39,43,40,.55);white-space:nowrap}
+tbody tr{cursor:pointer}
+tbody tr:hover,tbody tr.on{background:var(--accent-soft)}
+.scroll{overflow-x:auto}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:7px;
+  vertical-align:0}
+
+.detail .sym{font-family:var(--mono);font-size:26px;color:var(--heading)}
+.detail .q{font-size:13.5px;margin:6px 0 16px;line-height:1.5}
+.layer{margin-bottom:13px}
+.layer .top{display:flex;justify-content:space-between;font-size:12px}
+.layer .nm{color:var(--muted);font-family:var(--label);letter-spacing:.06em;
+  text-transform:uppercase;font-size:10px}
+.layer .vl{font-family:var(--mono);color:var(--heading)}
+.bar{height:7px;background:var(--sunken);border-radius:2px;margin-top:5px;position:relative;
+  overflow:hidden}
+.bar i{position:absolute;top:0;height:100%;border-radius:2px}
+.bar .mid{position:absolute;left:50%;top:-2px;height:11px;width:1px;background:var(--line)}
+.kv{display:flex;justify-content:space-between;font-family:var(--mono);font-size:12px;
+  padding:5px 0;border-bottom:1px solid rgba(39,43,40,.5)}
+.kv span:first-child{color:var(--muted)}
+.notes{margin-top:14px;font-size:13px;color:var(--warn);line-height:1.5}
+.notes div{padding-left:14px;position:relative;margin-bottom:5px}
+.notes div::before{content:"·";position:absolute;left:3px}
+
+.verdict{border:1px solid var(--line);border-left:3px solid var(--warn);
+  background:var(--raised);border-radius:4px;padding:15px 18px;margin-bottom:18px}
+.verdict h3{font-size:13px;font-family:var(--label);letter-spacing:.08em;
+  text-transform:uppercase;color:var(--warn);margin-bottom:7px}
+.verdict ul{margin:0;padding-left:18px}
+.verdict li{margin:4px 0;font-size:13.5px}
+.empty{color:var(--faint);font-family:var(--mono);font-size:13px;padding:24px 0;
+  line-height:1.7}
+.empty code{color:var(--accent);background:var(--sunken);padding:2px 6px;border-radius:3px}
+svg text{font-family:var(--mono);font-size:10px;fill:var(--faint)}
+footer{color:var(--faint);font-size:12px;border-top:1px solid var(--line);
+  padding-top:16px;margin-top:26px;max-width:86ch;line-height:1.6}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <svg width="30" height="30" viewBox="0 0 32 32" aria-hidden="true">
+    <path d="M12 6.5H7.5v19H12M20 6.5h4.5v19H20" fill="none" stroke="#e79a4b"
+      stroke-width="2.4" opacity=".55"/><circle cx="16" cy="16" r="3.5" fill="#e79a4b"/>
+  </svg>
+  <span class="brand">tradesights</span>
+  <span class="sp"></span>
+  <span class="tag safe">reads only · cannot trade</span>
+  <select id="session"></select>
+</header>
+
+<nav class="tabs" id="tabs">
+  <button data-tab="map" class="on">The map</button>
+  <button data-tab="list">Ranked</button>
+  <button data-tab="resolve">Did it go anywhere</button>
+  <button data-tab="archive">Archive</button>
+</nav>
+
+<div id="out"><p class="empty">Loading…</p></div>
+
+<footer>
+  Every name here is a question, not a call. There is no order execution in this
+  repo and no path from it to a broker — a design rule, not a missing feature.
+  Skew is a crude proxy for positioning: it cannot see who is on which side of a
+  trade, or whether a put was bought as a hedge or sold for income.
+  Clanker&nbsp;Labs.
+</footer>
+</div>
+<div class="tip" id="tip"></div>
+
+<script>
+const $ = s => document.querySelector(s);
+const out = $("#out"), tip = $("#tip");
+let TAB = "map", SNAP = null, FILTER = new Set(), SORT = {k:"divergence", d:-1};
+let SELECTED = null;
+
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c =>
+  ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const pct = (v,d=1) => v===null||v===undefined ? "—" : (v>=0?"+":"")+(v*100).toFixed(d)+"%";
+const z = v => v===null||v===undefined ? "—" : (v>=0?"+":"")+v.toFixed(2);
+
+function visible(){
+  if(!SNAP) return [];
+  return FILTER.size ? SNAP.rows.filter(r => FILTER.has(r.quadrant)) : SNAP.rows;
+}
+
+/* ---------- the map ---------------------------------------------------- */
+function plot(rows){
+  const W=880, H=620, P={t:40,r:40,b:52,l:64};
+  const iw=W-P.l-P.r, ih=H-P.t-P.b;
+  const all = SNAP.rows;
+  const span = Math.max(2, ...all.map(r => Math.max(Math.abs(r.price_z), Math.abs(r.money_z)))) * 1.1;
+  const X = v => P.l + (v+span)/(2*span)*iw;
+  const Y = v => P.t + ih - (v+span)/(2*span)*ih;
+  const cx=X(0), cy=Y(0);
+
+  /* Only the two DISAGREEMENT quadrants are washed. A name whose price and
+     options point the same way is the normal case; shading it would give equal
+     visual weight to the boring half of the market. */
+  const washes = `
+    <rect x="${P.l}" y="${P.t}" width="${cx-P.l}" height="${cy-P.t}"
+      fill="#6fbf8b" opacity=".045"/>
+    <rect x="${cx}" y="${cy}" width="${W-P.r-cx}" height="${P.t+ih-cy}"
+      fill="#d4695f" opacity=".045"/>`;
+
+  const grid = [-2,-1,1,2].filter(v=>Math.abs(v)<span).map(v=>
+    `<line x1="${X(v).toFixed(1)}" y1="${P.t}" x2="${X(v).toFixed(1)}" y2="${P.t+ih}"
+       stroke="#272b28"/>
+     <line x1="${P.l}" y1="${Y(v).toFixed(1)}" x2="${W-P.r}" y2="${Y(v).toFixed(1)}"
+       stroke="#272b28"/>`).join("");
+
+  const axes = `
+    <line x1="${P.l}" y1="${cy.toFixed(1)}" x2="${W-P.r}" y2="${cy.toFixed(1)}" stroke="#7e847e"/>
+    <line x1="${cx.toFixed(1)}" y1="${P.t}" x2="${cx.toFixed(1)}" y2="${P.t+ih}" stroke="#7e847e"/>
+    <text x="${P.l+10}" y="${P.t+18}" fill="#6fbf8b">someone is paying for a bounce</text>
+    <text x="${W-P.r-10}" y="${P.t+18}" fill="#7e847e" text-anchor="end">price and options agree</text>
+    <text x="${P.l+10}" y="${P.t+ih-10}" fill="#7e847e">price and options agree</text>
+    <text x="${W-P.r-10}" y="${P.t+ih-10}" fill="#d4695f" text-anchor="end">holders are nervous</text>
+    <text x="${W-P.r}" y="${H-16}" text-anchor="end">← weaker   price vs the market   stronger →</text>
+    <text x="${P.l-26}" y="${(P.t+ih/2).toFixed(0)}" text-anchor="middle"
+      transform="rotate(-90 ${P.l-26} ${(P.t+ih/2).toFixed(0)})">← bearish   options positioning   bullish →</text>`;
+
+  const shown = new Set(rows.map(r=>r.symbol));
+  const ranked = [...SNAP.rows].sort((a,b)=>a.divergence-b.divergence);
+  const named = new Set([...SNAP.rows].sort((a,b)=>b.divergence-a.divergence)
+    .slice(0,8).map(r=>r.symbol));
+
+  const dots = ranked.map(r=>{
+    const on = shown.has(r.symbol);
+    const lead = named.has(r.symbol) || SELECTED === r.symbol;
+    const rad = SELECTED === r.symbol ? 8 : (lead ? 5.5 : 3.4);
+    const label = (lead && on) ? `<text x="${(X(r.price_z) + (X(r.price_z) > W*0.7 ? -11 : 11)).toFixed(1)}"
+      y="${(Y(r.money_z)+4).toFixed(1)}" fill="#e9ebe7" font-size="11"
+      text-anchor="${X(r.price_z) > W*0.7 ? "end" : "start"}"
+      pointer-events="none">${esc(r.symbol)}</text>` : "";
+    return `<circle cx="${X(r.price_z).toFixed(1)}" cy="${Y(r.money_z).toFixed(1)}"
+      r="${rad}" fill="${r.colour}" opacity="${on ? (lead?0.95:0.55) : 0.1}"
+      stroke="${SELECTED===r.symbol ? "#e9ebe7" : "none"}" stroke-width="1.5"
+      data-sym="${esc(r.symbol)}" style="cursor:pointer"/>${label}`;
+  }).join("");
+
+  return `<svg id="plot" viewBox="0 0 ${W} ${H}" role="img"
+    aria-label="Price against options positioning for ${SNAP.n} names, z-scored">
+    ${washes}${grid}${axes}${dots}</svg>`;
+}
+
+function quadrantChips(){
+  const counts = SNAP.counts || {};
+  const meta = {};
+  SNAP.rows.forEach(r => meta[r.quadrant] = r.colour);
+  return `<div class="chips">` + Object.entries(counts)
+    .sort((a,b)=>b[1]-a[1]).map(([q,n])=>
+      `<button class="chip ${FILTER.has(q)?"on":""}" data-q="${esc(q)}"
+        style="color:${meta[q]}">${esc(q.replace(/_/g," "))}<span class="n">${n}</span></button>`
+    ).join("") +
+    (FILTER.size ? `<button class="chip" data-q="__all">clear</button>` : "") + `</div>`;
+}
+
+function detail(sym){
+  const r = SNAP.rows.find(x=>x.symbol===sym);
+  if(!r) return `<div class="panel detail"><p class="empty">Pick a name on the map.</p></div>`;
+  /* Colour by SIGN, not by layer. All three layers are oriented so that more
+     positive means more bullish, so a fixed per-layer colour puts a green bar
+     on a -1.84σ reading -- colour contradicting the number it is drawing, which
+     is the one thing a bar chart must never do. */
+  const barFor = v => {
+    const w = Math.min(50, Math.abs(v)/3*50);
+    const left = v >= 0 ? 50 : 50 - w;
+    const colour = v >= 0 ? "#6fbf8b" : "#d4695f";
+    return `<div class="bar"><div class="mid"></div>
+      <i style="left:${left}%;width:${w}%;background:${colour}"></i></div>`;
+  };
+  return `<div class="panel detail">
+    <div class="sym">${esc(r.symbol)}</div>
+    <div class="q" style="color:${r.colour}">${esc(r.quadrant_plain)}</div>
+
+    <div class="layer"><div class="top"><span class="nm">price vs market</span>
+      <span class="vl">${z(r.price_z)}σ</span></div>${barFor(r.price_z)}</div>
+    <div class="layer"><div class="top"><span class="nm">options positioning</span>
+      <span class="vl">${z(r.money_z)}σ</span></div>${barFor(r.money_z)}</div>
+    <div class="layer"><div class="top"><span class="nm">talk</span>
+      <span class="vl">${r.talk_z===null?"not measured":z(r.talk_z)+"σ"}</span></div>
+      ${r.talk_z===null
+        ? `<div class="bar"></div>`
+        : barFor(r.talk_z)}</div>
+
+    <div style="margin-top:16px">
+      <div class="kv"><span>divergence</span><span>${r.divergence.toFixed(2)}</span></div>
+      <div class="kv"><span>1-month vs market</span><span>${pct(r.rel_1m)}</span></div>
+      <div class="kv"><span>close when measured</span><span>${r.price||"—"}</span></div>
+      <div class="kv"><span>options conflict</span><span>${r.positioning_conflict.toFixed(2)}</span></div>
+    </div>
+
+    <div class="notes">
+      ${r.talk_z===null ? `<div>Talk was not measured. Absent is scored as absent,
+        never as neutral — a name nobody discussed and a name nobody checked are
+        different facts.</div>` : ""}
+      ${r.positioning_conflict > 1.5 ? `<div>The options market is split with
+        itself: protection is being paid for while calls trade. That is a
+        different disagreement from the one the ranking is about.</div>` : ""}
+      ${!r.disagreement ? `<div>Price and options point the same way here, which
+        is the normal case. This name is context for the outliers, not one of
+        them.</div>` : ""}
+    </div>
+    <div id="nhist" style="margin-top:18px"></div>
+  </div>`;
+}
+
+/* One name's divergence across stored sessions. Answers the thing a single scan
+   structurally cannot: has this been stretched for a fortnight, or did it arrive
+   this morning. */
+function historyChart(h){
+  if(h.length < 2) return `<div style="font-size:12.5px;color:var(--faint);
+    line-height:1.5">Only ${h.length} stored reading. The archive grows forward,
+    one session at a time — come back tomorrow.</div>`;
+  const W=340,H=90,P={t:10,r:8,b:18,l:26};
+  const iw=W-P.l-P.r, ih=H-P.t-P.b;
+  const hi=Math.max(...h.map(o=>o.divergence), 1);
+  const X=i => P.l + (h.length<2?iw/2:i*iw/(h.length-1));
+  const Y=v => P.t + ih - v/hi*ih;
+  const line=h.map((o,i)=>`${i?"L":"M"}${X(i).toFixed(1)} ${Y(o.divergence).toFixed(1)}`).join(" ");
+  const dots=h.map((o,i)=>`<circle cx="${X(i).toFixed(1)}" cy="${Y(o.divergence).toFixed(1)}"
+    r="2.6" fill="${o.colour}"/>`).join("");
+  return `<div style="font-family:var(--label);font-size:10px;letter-spacing:.08em;
+      text-transform:uppercase;color:var(--muted);margin-bottom:6px">
+      divergence, ${h.length} sessions</div>
+    <svg viewBox="0 0 ${W} ${H}" width="100%" role="img"
+      aria-label="Divergence over ${h.length} stored sessions">
+      <line x1="${P.l}" x2="${W-P.r}" y1="${Y(0).toFixed(1)}" y2="${Y(0).toFixed(1)}"
+        stroke="#272b28"/>
+      <text x="${P.l-6}" y="${(Y(hi)+4).toFixed(1)}" text-anchor="end">${hi.toFixed(1)}</text>
+      <path d="${line}" fill="none" stroke="#e79a4b" stroke-width="1.6"/>${dots}
+      <text x="${P.l}" y="${H-4}">${esc(h[0].session)}</text>
+      <text x="${W-P.r}" y="${H-4}" text-anchor="end">${esc(h[h.length-1].session)}</text>
+    </svg>`;
+}
+
+async function loadHistory(sym){
+  const box = $("#nhist");
+  if(!box) return;
+  try{
+    const d = await (await fetch(`/api/name/${encodeURIComponent(sym)}`)).json();
+    if(d.detail){ box.innerHTML = ""; return; }
+    box.innerHTML = historyChart(d.history) +
+      (d.streak > 1 ? `<div style="font-size:12.5px;color:var(--body);margin-top:8px">
+        In this quadrant for ${d.streak} straight sessions.</div>` : "");
+  }catch{ box.innerHTML = ""; }
+}
+
+function select(sym){
+  SELECTED = sym;
+  renderMap();
+  if(sym) loadHistory(sym);
+}
+
+function renderMap(){
+  const rows = visible();
+  out.innerHTML = `<div class="split">
+    <div class="panel"><h2>Price against positioning · ${SNAP.n} names</h2>
+      <p class="hint">Every scanned name, z-scored against the others in the same
+      run — which is the only reason a utility and a biotech can share a plot. A
+      calm morning is a cloud around the origin; a morning where the options
+      market has stopped agreeing with price grows two diagonal wings. Click a
+      dot, or filter by quadrant.</p>
+      ${quadrantChips()}${plot(rows)}</div>
+    ${detail(SELECTED)}</div>`;
+
+  out.querySelectorAll(".chip").forEach(c => c.addEventListener("click", () => {
+    const q = c.dataset.q;
+    if(q === "__all") FILTER.clear();
+    else if(FILTER.has(q)) FILTER.delete(q);
+    else FILTER.add(q);
+    renderMap();
+  }));
+
+  const svg = $("#plot");
+  if(svg){
+    svg.addEventListener("click", e => {
+      const c = e.target.closest("circle[data-sym]");
+      if(c) select(c.dataset.sym);
+    });
+    svg.addEventListener("mousemove", e => {
+      const c = e.target.closest("circle[data-sym]");
+      if(!c){ tip.classList.remove("on"); return; }
+      const r = SNAP.rows.find(x=>x.symbol===c.dataset.sym);
+      tip.innerHTML = `<div class="s">${esc(r.symbol)}</div>
+        <div style="color:${r.colour}">${esc(r.quadrant_short)}</div>
+        <div>price ${z(r.price_z)}σ · options ${z(r.money_z)}σ</div>
+        <div>divergence ${r.divergence.toFixed(2)}</div>`;
+      tip.style.left = Math.min(window.innerWidth-300, e.clientX+16)+"px";
+      tip.style.top = (e.clientY+16)+"px";
+      tip.classList.add("on");
+    });
+    svg.addEventListener("mouseleave", () => tip.classList.remove("on"));
+  }
+  if(SELECTED) loadHistory(SELECTED);
+}
+
+/* ---------- ranked list ------------------------------------------------ */
+function renderList(){
+  const rows = [...visible()].sort((a,b) =>
+    (a[SORT.k] > b[SORT.k] ? 1 : a[SORT.k] < b[SORT.k] ? -1 : 0) * SORT.d);
+  const th = (k, label, right) =>
+    `<th class="${right?"r":""}" data-k="${k}">${label}${SORT.k===k?(SORT.d<0?" ↓":" ↑"):""}</th>`;
+  out.innerHTML = `<div class="panel"><h2>Ranked</h2>
+    <p class="hint">Sorted by how far the layers disagree, which measures how
+    <em>interesting</em> a name is — not which way it goes. Click a column to
+    re-sort, a row to open it on the map.</p>
+    ${quadrantChips()}
+    <div class="scroll"><table><thead><tr>
+      ${th("symbol","name")}${th("quadrant","situation")}
+      ${th("price_z","price",1)}${th("money_z","options",1)}
+      ${th("rel_1m","1m vs mkt",1)}${th("divergence","divergence",1)}
+    </tr></thead><tbody>${rows.map(r=>`<tr data-sym="${esc(r.symbol)}">
+      <td><span class="dot" style="background:${r.colour}"></span>${esc(r.symbol)}</td>
+      <td style="color:${r.colour}">${esc(r.quadrant.replace(/_/g," "))}</td>
+      <td class="r">${z(r.price_z)}σ</td><td class="r">${z(r.money_z)}σ</td>
+      <td class="r">${pct(r.rel_1m)}</td>
+      <td class="r">${r.divergence.toFixed(2)}</td></tr>`).join("")}
+    </tbody></table></div></div>`;
+
+  out.querySelectorAll("th[data-k]").forEach(h => h.addEventListener("click", () => {
+    const k = h.dataset.k;
+    SORT = {k, d: SORT.k === k ? -SORT.d : -1};
+    renderList();
+  }));
+  out.querySelectorAll(".chip").forEach(c => c.addEventListener("click", () => {
+    const q = c.dataset.q;
+    if(q === "__all") FILTER.clear();
+    else if(FILTER.has(q)) FILTER.delete(q);
+    else FILTER.add(q);
+    renderList();
+  }));
+  out.querySelectorAll("tr[data-sym]").forEach(tr => tr.addEventListener("click", () => {
+    SELECTED = tr.dataset.sym;
+    TAB = "map";
+    $("#tabs").querySelectorAll("button").forEach(b=>b.classList.toggle("on", b.dataset.tab==="map"));
+    renderMap();
+  }));
+}
+
+/* ---------- resolution ------------------------------------------------- */
+async function renderResolve(){
+  out.innerHTML = '<p class="empty">Scoring the archive…</p>';
+  const horizon = 5;
+  const d = await (await fetch(`/api/resolve?horizon=${horizon}`)).json();
+
+  if(!d.scores.length){
+    out.innerHTML = `<div class="panel"><h2>Did it go anywhere</h2>
+      <p class="empty">${d.reasons.map(esc).join("<br>")}<br><br>
+      The archive grows forward, one session at a time. It cannot be backfilled:
+      reconstructing history from today's revised data would be a backtest of a
+      screener against its own inputs, which confirms whatever you already
+      believe.<br><br>
+      Record a session with <code>tradesights snapshot</code>.</p></div>`;
+    return;
+  }
+
+  const rows = d.scores.map(s=>`<tr>
+    <td><span class="dot" style="background:${s.colour}"></span>${esc(s.quadrant.replace(/_/g," "))}</td>
+    <td class="r">${s.n}</td>
+    <td class="r">${pct(s.mean_return,2)}</td>
+    <td class="r">${pct(s.median_return,2)}</td>
+    <td class="r">${(s.hit_rate*100).toFixed(0)}%</td>
+    <td class="r">${pct(s.baseline,2)}</td>
+    <td class="r" style="color:${s.edge>0?"var(--up)":"var(--down)"}">${pct(s.edge,2)}</td>
+  </tr>`).join("");
+
+  out.innerHTML = (d.reasons.length ? `<div class="verdict">
+    <h3>Reasons not to believe this yet</h3><ul>${
+      d.reasons.map(r=>`<li>${esc(r)}</li>`).join("")}</ul></div>` : "") +
+  `<div class="panel"><h2>What happened next · ${horizon}-day horizon</h2>
+    <p class="hint">Read the <strong>edge</strong> column, not the mean. Edge is
+    this quadrant's average forward return minus everything else's over the same
+    sessions: in a rising market every quadrant looks predictive, and subtracting
+    the market is the only way to tell a signal from a tide.</p>
+    <div class="scroll"><table><thead><tr>
+      <th>situation</th><th class="r">n</th><th class="r">mean</th>
+      <th class="r">median</th><th class="r">hit rate</th>
+      <th class="r">universe</th><th class="r">edge</th>
+    </tr></thead><tbody>${rows}</tbody></table></div>
+    <p class="hint" style="margin:16px 0 0">A forward return after a signal is
+    not a trade. There is no entry rule, no stop, no size and no cost here, and
+    the difference between "these names drifted up 1.2%" and "this made money" is
+    every part of trading that is hard.</p></div>`;
+}
+
+/* ---------- archive ---------------------------------------------------- */
+async function renderArchive(){
+  const d = await (await fetch("/api/sessions")).json();
+  const rows = d.sessions.map(s=>`<tr data-session="${esc(s.session)}">
+    <td>${esc(s.session)}</td><td class="r">${s.n}</td>
+    <td>${s.has_talk ? "yes" : "—"}</td><td>${esc(s.regime || "—")}</td>
+    <td style="color:var(--faint)">${esc(s.taken_at.slice(0,16).replace("T"," "))}</td>
+  </tr>`).join("");
+  out.innerHTML = `<div class="panel"><h2>Archive · ${d.sessions.length} sessions</h2>
+    <p class="hint">One snapshot per trading session, enforced by the schema
+    rather than by convention — a cron that fires twice would otherwise
+    double-weight that day in every statistic computed later, silently. Click a
+    row to load it.</p>
+    <div class="scroll"><table><thead><tr>
+      <th>session</th><th class="r">names</th><th>talk</th><th>regime</th><th>recorded</th>
+    </tr></thead><tbody>${rows}</tbody></table></div></div>`;
+  out.querySelectorAll("tr[data-session]").forEach(tr =>
+    tr.addEventListener("click", () => {
+      $("#session").value = tr.dataset.session;
+      loadSession(tr.dataset.session);
+    }));
+}
+
+/* ---------- shell ------------------------------------------------------ */
+function render(){
+  if(TAB === "resolve") return renderResolve();
+  if(TAB === "archive") return renderArchive();
+  if(!SNAP){
+    out.innerHTML = `<div class="panel"><h2>Nothing recorded yet</h2>
+      <p class="empty">The archive is empty. Record a session with
+      <code>tradesights snapshot</code>, then reload.<br><br>
+      The dashboard reads the archive rather than the market: a live scan pulls
+      43 option chains and takes minutes, which is not a thing to do inside an
+      HTTP request.</p></div>`;
+    return;
+  }
+  (TAB === "map" ? renderMap : renderList)();
+}
+
+async function loadSession(session){
+  out.innerHTML = '<p class="empty">Loading…</p>';
+  try{
+    const r = await fetch("/api/snapshot?session=" + encodeURIComponent(session || ""));
+    const d = await r.json();
+    SNAP = d.detail ? null : d;
+    // Open on the most divergent name rather than an empty panel. The top of
+    // the list is what the tool is for, and making the reader click once to
+    // see it is one click of nothing.
+    if(SNAP && SNAP.rows.length && !SNAP.rows.some(r => r.symbol === SELECTED))
+      SELECTED = SNAP.rows[0].symbol;
+  }catch{ SNAP = null; }
+  render();
+}
+
+async function boot(){
+  const q = new URLSearchParams(location.search);
+  if(q.get("tab")) TAB = q.get("tab");
+  if(q.get("symbol")) SELECTED = q.get("symbol").toUpperCase();
+  $("#tabs").querySelectorAll("button").forEach(b =>
+    b.classList.toggle("on", b.dataset.tab === TAB));
+  const d = await (await fetch("/api/sessions")).json();
+  $("#session").innerHTML = d.sessions.length
+    ? d.sessions.map(s=>`<option value="${esc(s.session)}">${esc(s.session)} · ${s.n} names</option>`).join("")
+    : `<option>no sessions</option>`;
+  $("#tabs").addEventListener("click", e => {
+    const b = e.target.closest("button[data-tab]");
+    if(!b) return;
+    TAB = b.dataset.tab;
+    $("#tabs").querySelectorAll("button").forEach(x=>x.classList.toggle("on", x===b));
+    render();
+  });
+  $("#session").addEventListener("change", () => loadSession($("#session").value));
+  await loadSession(d.sessions.length ? d.sessions[0].session : "");
+}
+boot();
+</script>
+</body>
+</html>

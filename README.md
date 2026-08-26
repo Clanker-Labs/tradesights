@@ -73,7 +73,77 @@ heatmaps (eleven coloured squares saying "tech is up", presented as analysis),
 and anything with a price chart on it — the whole premise is that the price
 chart is the layer everyone already has.
 
+## The archive, and the only question that matters
+
+Without memory this tool produces an opinion every morning and forgets it by
+lunch. That is enough to decide what to look at. It is not enough to decide
+whether looking there was ever worth it — because the useful question is not
+*which names are stretched today* but **when a name looked like this before,
+what happened next?**, and answering it needs yesterday.
+
+```bash
+tradesights snapshot         # write today's scan down
+tradesights sessions         # what is in the archive
+tradesights resolve          # did the disagreements go anywhere
+```
+
+A snapshot stores the z-scores, the quadrant, the divergence and — the field
+that makes the rest useful — the close each reading was measured against. A
+snapshot without a price records only that a name looked interesting, never
+whether it then went anywhere.
+
+`resolve` groups resolved observations by quadrant and reports an **edge**
+column: that quadrant's mean forward return minus everything else's over the
+same sessions. Read that column and not the mean. In a rising market every
+quadrant looks predictive, and subtracting the market is the only way to tell a
+signal from a tide.
+
+Three things it is not, and each is load-bearing:
+
+**Not a backtest.** It cannot be. The archive starts the day it is switched on
+and accumulates forward in real time. Nothing reconstructs history from current
+data — that would be a backtest of a screener against its own inputs, which is a
+machine for confirming whatever you already believe.
+
+**Not a performance record.** A forward return after a signal is not a trade.
+There is no entry rule, no stop, no size and no cost, and the difference between
+"names in this quadrant drifted up 1.2% over five days" and "this made money" is
+every part of trading that is hard.
+
+**Not going to say anything for months.** Thirty sessions is six trading weeks,
+and every name on the same day shares a market — so the effective sample grows
+far more slowly than the row count suggests. `resolve` says so itself rather
+than printing a confident percentage.
+
+Put it on a timer; see [`deploy/`](deploy/). A session missed is a session that
+can never be recovered, since option chains are not retrievable after the fact.
+
+## The dashboard
+
+```bash
+tradesights dashboard        # http://127.0.0.1:8095
+```
+
+Loopback, unauthenticated, and structurally unable to place an order. It reads
+the archive rather than the market: a live scan pulls 43 option chains and takes
+minutes, which is not a thing to do inside an HTTP request. An empty archive
+shows as an empty archive with the command to fix it, rather than as a broken
+page.
+
+Four views:
+
+- **The map** — every scanned name on one plot, price against positioning. Click
+  a dot for that name's three layers and its divergence across stored sessions,
+  which answers the thing a single scan structurally cannot: has this been
+  stretched for a fortnight, or did it arrive this morning?
+- **Ranked** — the sortable table, filterable by quadrant.
+- **Did it go anywhere** — the resolution scores, with the reasons not to
+  believe them printed above the numbers.
+- **Archive** — what has been recorded, and a way to load any past session.
+
 ## Site
+
+
 
 <https://clanker-labs.github.io/tradesights/> — with a demo built entirely from
 a real scan.

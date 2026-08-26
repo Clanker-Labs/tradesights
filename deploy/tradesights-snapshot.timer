@@ -1,0 +1,15 @@
+[Unit]
+Description=Record a tradesights scan after the US close on trading days
+
+[Timer]
+# 16:30 New York, half an hour after the close, so the day's option volume is
+# settled. Weekdays only -- there is no session to record at the weekend, and a
+# scan run then would store Friday's numbers again under Saturday's date and
+# quietly double-weight Friday in every statistic computed later.
+OnCalendar=Mon..Fri *-*-* 16:30:00 America/New_York
+# A box that was asleep at 16:30 should still record the day when it wakes.
+Persistent=true
+RandomizedDelaySec=5min
+
+[Install]
+WantedBy=timers.target

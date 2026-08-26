@@ -4,6 +4,9 @@
     tradesights scan       which names disagree with themselves
     tradesights name NVDA  everything known about one name
     tradesights chart      the whole universe, plotted, to see if today is unusual
+    tradesights snapshot   write today's scan down, so it can be scored later
+    tradesights resolve    did the disagreements go anywhere
+    tradesights dashboard  the research view
 
 Output is a table meant to be read at seven in the morning by somebody who has
 not had coffee and does not want to interpret a chart.
@@ -177,6 +180,119 @@ def name(symbol: str, verbose: bool = typer.Option(False, "--verbose", "-v")) ->
     else:
         console.print(f"  talk       {t.sentiment:+.2f} across {t.mentions} {t.source} mentions")
     console.print()
+
+
+@app.command()
+def snapshot(
+    no_talk: bool = typer.Option(True, "--no-talk/--talk"),
+    session: str = typer.Option("", help="YYYY-MM-DD. Defaults to today."),
+    verbose: bool = typer.Option(False, "--verbose", "-v"),
+) -> None:
+    """Record today's scan, so it can be asked later whether it was right.
+
+    Without an archive this tool produces an opinion every morning and forgets
+    it by lunch -- which is enough to decide what to look at and not enough to
+    decide whether looking there was ever worth it. Run it from a cron on
+    trading days; re-running replaces that session rather than double-counting
+    it.
+    """
+    from tradesights import store
+
+    _setup_logging(verbose)
+    prices, money, talk = _gather(LIQUID, with_talk=not no_talk)
+    rows = build_rows(prices, money, talk)
+    if not rows:
+        console.print("[yellow]Nothing to record — no name had both price and "
+                      "options.[/] Not written.")
+        raise typer.Exit(1)
+
+    regime = macro.describe(macro.fetch_regime())
+    snapshot_id = store.save(rows, prices=prices, regime=regime,
+                             session=session or None)
+    kept = store.sessions(limit=9999)
+    console.print(f"[green]recorded[/] {len(rows)} names as snapshot {snapshot_id}")
+    console.print(f"[dim]{len(kept)} sessions stored · {store.db_path()}[/dim]")
+    if len(kept) < 30:
+        console.print(f"[yellow]{len(kept)} sessions is not enough to conclude "
+                      "anything.[/] The archive only grows forward — it cannot be "
+                      "backfilled without reconstructing history from today's "
+                      "revised data, which would confirm whatever you already "
+                      "believe.")
+
+
+@app.command()
+def resolve(
+    horizon: int = typer.Option(5, "--horizon", help="Calendar days ahead."),
+    verbose: bool = typer.Option(False, "--verbose", "-v"),
+) -> None:
+    """Score the archive: when a name looked like this, what happened next."""
+    from tradesights import store
+
+    _setup_logging(verbose)
+    outcomes = store.resolve(horizon)
+    scores, reasons = store.score_quadrants(outcomes)
+
+    if not scores:
+        for reason in reasons:
+            console.print(f"[yellow]{reason}[/]")
+        raise typer.Exit(1)
+
+    table = Table(title=f"{len(outcomes)} observations resolved over {horizon} days",
+                  title_justify="left")
+    table.add_column("quadrant")
+    for column in ("n", "mean", "median", "hit rate", "universe", "edge"):
+        table.add_column(column, justify="right")
+    for score in scores:
+        style = "green" if score.edge > 0 else "red"
+        table.add_row(score.quadrant.replace("_", " "), str(score.n),
+                      f"{score.mean_return:+.2%}", f"{score.median_return:+.2%}",
+                      f"{score.hit_rate:.0%}", f"{score.baseline:+.2%}",
+                      f"[{style}]{score.edge:+.2%}[/]")
+    console.print(table)
+    console.print()
+    console.print("[dim]edge = this quadrant's mean minus everything else's over the "
+                  "same sessions. Read that column, not the mean: in a rising "
+                  "market every quadrant looks predictive.[/dim]")
+    if reasons:
+        console.print()
+        console.print("[bold yellow]Reasons not to believe this yet:[/]")
+        for reason in reasons:
+            console.print(f"  • {reason}")
+    console.print()
+    console.print("[dim]A forward return after a signal is not a trade. There is no "
+                  "entry rule, no stop, no size and no cost here, and the gap "
+                  "between the two is every part of trading that is hard.[/dim]")
+
+
+@app.command()
+def sessions(limit: int = typer.Option(20, help="How many to list.")) -> None:
+    """What is in the archive."""
+    from tradesights import store
+
+    rows = store.sessions(limit=limit)
+    if not rows:
+        console.print("[yellow]The archive is empty.[/] Run `tradesights snapshot`.")
+        raise typer.Exit(1)
+    table = Table(title=f"{store.db_path()}", title_justify="left")
+    table.add_column("session")
+    table.add_column("names", justify="right")
+    table.add_column("talk")
+    table.add_column("regime")
+    for row in rows:
+        table.add_row(row["session"], str(row["n"]),
+                      "yes" if row["has_talk"] else "—", row["regime"] or "—")
+    console.print(table)
+
+
+@app.command()
+def dashboard(
+    host: str = typer.Option("127.0.0.1"),
+    port: int = typer.Option(8095),
+) -> None:
+    """Serve the research dashboard. Loopback by default; it is not authenticated."""
+    from tradesights.dashboard.server import serve
+
+    serve(host=host, port=port)
 
 
 if __name__ == "__main__":
