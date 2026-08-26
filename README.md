@@ -47,6 +47,37 @@ Adding the talk layer gives two more that price and options alone cannot see:
 - **Hype without money** — loud and bullish, with no positioning behind it.
 - **Money without hype** — positioning hard, and nobody is discussing it.
 
+## The one chart
+
+The ranked list says what to look at. It cannot say whether today is *unusual* —
+five names above a divergence of 2 is either a market coming apart or an
+ordinary Tuesday, and the top of a table looks identical either way.
+
+```bash
+tradesights chart -o quadrants.svg
+```
+
+plots every scanned name, price against positioning, both z-scored against each
+other. A calm morning is a cloud around the origin; a morning where the options
+market has stopped agreeing with price grows two diagonal wings. Standalone SVG,
+no plotting library, nothing to install.
+
+![the quadrant map](docs/media/quadrants.svg)
+
+Only the two *disagreement* quadrants are shaded, because a name whose price and
+options point the same way is the normal case and giving it equal visual weight
+would give equal weight to the boring half of the market. Deliberately not
+drawn: a time series of divergence (it would need history this tool does not
+keep, and drawing it from one snapshot means fabricating the past), sector
+heatmaps (eleven coloured squares saying "tech is up", presented as analysis),
+and anything with a price chart on it — the whole premise is that the price
+chart is the layer everyone already has.
+
+## Site
+
+<https://clanker-labs.github.io/tradesights/> — with a demo built entirely from
+a real scan.
+
 ## What it is not
 
 **Not a prediction.** Every name it surfaces is a question. The list is ranked by

@@ -1,0 +1,364 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>tradesights — where price, positioning and talk stop agreeing</title>
+<meta name="description" content="A screener that ranks the stocks where price, options positioning and social talk disagree most. Open source, from Clanker Labs.">
+<meta property="og:title" content="tradesights">
+<meta property="og:description" content="Talk is cheap. Options cost money. This ranks the names where those two stop agreeing.">
+<meta property="og:type" content="website">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23181b19'/%3E%3Cpath d='M12 8.5H9.5v15H12M20 8.5h2.5v15H20' fill='none' stroke='%23e79a4b' stroke-width='2.4' opacity='.55'/%3E%3Ccircle cx='16' cy='16' r='3.5' fill='%23e79a4b'/%3E%3C/svg%3E">
+<style>
+/* The Porchlight families, self-hosted. A page arguing that free things carry
+   a cost should not fetch its own typeface from a third party. See
+   fonts/README.md; all four are OFL 1.1. */
+@font-face{font-family:"Archivo";src:url("fonts/archivo-latin.woff2") format("woff2");
+  font-weight:100 900;font-display:swap;font-style:normal}
+@font-face{font-family:"Archivo Narrow";src:url("fonts/archivo-narrow-latin.woff2") format("woff2");
+  font-weight:100 900;font-display:swap;font-style:normal}
+@font-face{font-family:"Source Serif 4";src:url("fonts/source-serif-4-latin-wght.woff2") format("woff2");
+  font-weight:200 900;font-display:swap;font-style:normal}
+@font-face{font-family:"JetBrains Mono";src:url("fonts/jetbrains-mono-latin.woff2") format("woff2");
+  font-weight:100 800;font-display:swap;font-style:normal}
+:root{
+  --bg:#101211; --raised:#181b19; --line:#272b28;
+  --heading:#e9ebe7; --body:#a9aea8; --muted:#7e847e; --faint:#636963;
+  --accent:#e79a4b; --accent-soft:rgba(231,154,75,.08);
+  --up:#6fbf8b; --warn:#e0b341; --down:#d4695f;
+  --display:"Archivo",ui-sans-serif,system-ui,-apple-system,sans-serif;
+  --label:"Archivo Narrow","Archivo",ui-sans-serif,sans-serif;
+  --prose:"Source Serif 4",ui-serif,Georgia,serif;
+  --mono:"JetBrains Mono",ui-monospace,"SF Mono",Menlo,monospace;
+  --swift:cubic-bezier(.645,.045,.355,1);
+  --measure:68ch;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--body);
+  font-family:var(--display);font-size:16px;line-height:1.62;
+  -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+h1,h2,h3{color:var(--heading);font-weight:600;line-height:1.2;margin:0}
+p{margin:0 0 1.1em;max-width:var(--measure)}
+a{color:var(--accent);text-decoration:none;border-bottom:1px solid rgba(231,154,75,.3);
+  transition:border-color .18s var(--swift)}
+a:hover{border-bottom-color:var(--accent)}
+strong{color:var(--heading);font-weight:600}
+code{font-family:var(--mono);font-size:.88em;color:var(--heading);
+  background:var(--raised);border:1px solid var(--line);border-radius:3px;padding:1px 5px}
+.wrap{max-width:1080px;margin:0 auto;padding:0 24px}
+.eyebrow{font-family:var(--label);font-size:11px;letter-spacing:.08em;
+  text-transform:uppercase;color:var(--muted);margin-bottom:14px}
+
+/* ---- nav ---- */
+nav{position:sticky;top:0;z-index:20;background:rgba(16,18,17,.92);
+  backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+nav .wrap{display:flex;align-items:center;gap:12px;height:60px}
+nav .name{font-family:var(--label);font-size:19px;color:var(--heading);letter-spacing:.01em}
+nav .sp{flex:1}
+nav a{font-family:var(--label);font-size:13px;letter-spacing:.04em;color:var(--muted);
+  border:0;text-transform:uppercase}
+nav a:hover{color:var(--accent)}
+
+/* ---- hero ---- */
+header.hero{padding:88px 0 64px;border-bottom:1px solid var(--line)}
+h1{font-size:clamp(2.6rem,7vw,4.2rem);letter-spacing:-.02em}
+.lede{font-family:var(--prose);font-size:clamp(1.15rem,2.4vw,1.4rem);
+  color:var(--body);max-width:56ch;margin:22px 0 0;line-height:1.5}
+.lede strong{color:var(--heading)}
+.cta{display:flex;gap:12px;flex-wrap:wrap;margin-top:34px}
+.btn{font-family:var(--label);font-size:13px;letter-spacing:.06em;text-transform:uppercase;
+  padding:11px 22px;border-radius:3px;border:1px solid var(--line);color:var(--body);
+  transition:all .18s var(--swift)}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#17120b;border-color:var(--accent)}
+.btn.primary:hover{filter:brightness(1.1);color:#17120b}
+
+/* ---- video ---- */
+.player{margin:44px 0 0;border:1px solid var(--line);border-radius:6px;overflow:hidden;
+  background:var(--raised)}
+.player video{display:block;width:100%;height:auto}
+.player .cap{font-family:var(--mono);font-size:12px;color:var(--faint);
+  padding:11px 16px;border-top:1px solid var(--line)}
+
+section{padding:72px 0;border-bottom:1px solid var(--line)}
+section h2{font-size:clamp(1.6rem,3.4vw,2.1rem);margin-bottom:8px;letter-spacing:-.01em}
+section .sub{color:var(--muted);margin-bottom:34px;max-width:var(--measure)}
+
+.cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(268px,1fr));gap:22px;margin-top:8px}
+.card{background:var(--raised);border:1px solid var(--line);border-radius:5px;padding:22px}
+.card h3{font-size:1.02rem;margin-bottom:9px}
+.card p{font-size:14.5px;margin:0;color:var(--body)}
+.card .k{font-family:var(--label);font-size:10px;letter-spacing:.08em;
+  text-transform:uppercase;color:var(--muted);margin-bottom:10px}
+.card.price h3{color:var(--accent)}
+.card.money h3{color:var(--up)}
+.card.talk h3{color:var(--muted)}
+
+/* ---- quadrant table ---- */
+.quad{display:grid;grid-template-columns:auto 1fr 1fr;gap:1px;background:var(--line);
+  border:1px solid var(--line);border-radius:5px;overflow:hidden;margin-top:8px}
+.quad>div{background:var(--raised);padding:18px 20px}
+.quad .h{font-family:var(--label);font-size:11px;letter-spacing:.08em;
+  text-transform:uppercase;color:var(--muted)}
+.quad .n{font-family:var(--mono);font-size:14px;color:var(--heading);margin-bottom:5px}
+.quad .d{font-size:13.5px;color:var(--body)}
+.quad .live .n{color:var(--up)} .quad .live2 .n{color:var(--down)}
+
+/* ---- chart ---- */
+figure{margin:0}
+.chart{background:var(--raised);border:1px solid var(--line);border-radius:5px;
+  padding:18px;overflow-x:auto}
+.chart img,.chart svg{display:block;width:100%;height:auto;max-width:820px;margin:0 auto}
+figcaption{font-size:13.5px;color:var(--faint);margin-top:14px;max-width:var(--measure)}
+
+/* ---- terminal ---- */
+.term{background:#0c0e0d;border:1px solid var(--line);border-radius:5px;overflow:hidden}
+.term .bar{display:flex;align-items:center;gap:7px;padding:10px 14px;
+  border-bottom:1px solid var(--line);background:var(--raised)}
+.term .bar i{width:9px;height:9px;border-radius:50%;background:var(--line);display:block}
+.term .bar span{font-family:var(--mono);font-size:11px;color:var(--faint);margin-left:6px}
+.term pre{margin:0;padding:20px 22px;overflow-x:auto;font-family:var(--mono);
+  font-size:13px;line-height:1.75;color:var(--body)}
+.term .p{color:var(--accent)}
+.term .hl{color:var(--heading)}
+.term .dim{color:var(--faint)}
+
+ul.plain{list-style:none;padding:0;margin:0;max-width:var(--measure)}
+ul.plain li{padding:14px 0 14px 22px;border-bottom:1px solid var(--line);position:relative;
+  font-size:14.5px}
+ul.plain li:last-child{border-bottom:0}
+ul.plain li::before{content:"";position:absolute;left:0;top:22px;width:7px;height:7px;
+  border-radius:50%;background:var(--warn);opacity:.75}
+ul.plain li strong{display:block;margin-bottom:3px}
+
+.notrade{border:1px solid var(--line);border-left:3px solid var(--up);
+  background:var(--raised);border-radius:4px;padding:22px 24px;max-width:var(--measure)}
+.notrade h3{color:var(--up);font-family:var(--label);font-size:13px;
+  letter-spacing:.08em;text-transform:uppercase;margin-bottom:9px}
+.notrade p{margin:0;font-size:14.5px}
+
+footer{padding:56px 0 72px;color:var(--faint);font-size:13.5px}
+footer .row{display:flex;gap:26px;flex-wrap:wrap;align-items:center}
+footer a{color:var(--muted);border:0}
+footer a:hover{color:var(--accent)}
+</style>
+</head>
+<body>
+
+<nav><div class="wrap">
+  <svg width="26" height="26" viewBox="0 0 32 32" aria-hidden="true">
+    <path d="M12 6.5H7.5v19H12M20 6.5h4.5v19H20" fill="none" stroke="#e79a4b"
+      stroke-width="2.4" opacity=".55"/><circle cx="16" cy="16" r="3.5" fill="#e79a4b"/>
+  </svg>
+  <span class="name">tradesights</span>
+  <span class="sp"></span>
+  <a href="#layers">How</a>
+  <a href="#map">The map</a>
+  <a href="#limits">Limits</a>
+  <a href="https://github.com/Clanker-Labs/tradesights">GitHub</a>
+</div></nav>
+
+<header class="hero"><div class="wrap">
+  <div class="eyebrow">Clanker Labs · open source</div>
+  <h1>tradesights</h1>
+  <p class="lede"><strong>Talk is cheap. Options cost money.</strong> This ranks
+  the stocks where those two stop agreeing — and puts the biggest disagreement
+  at the top of one list you can read before coffee.</p>
+  <div class="cta">
+    <a class="btn primary" href="https://github.com/Clanker-Labs/tradesights">Read the source</a>
+    <a class="btn" href="#map">See a real scan</a>
+  </div>
+
+  <div class="player">
+    <video controls muted playsinline preload="metadata" poster="media/poster.png">
+      <source src="media/demo.mp4" type="video/mp4">
+      Your browser cannot play this video. The source is in the repo.
+    </video>
+    <div class="cap">Every number in this is from a live scan — 43 names, their
+      actual z-scores, the headlines the tool actually wrote.</div>
+  </div>
+</div></header>
+
+<section id="layers"><div class="wrap">
+  <div class="eyebrow">The premise</div>
+  <h2>Three layers, and the distance between them</h2>
+  <p class="sub">A price chart is the layer everybody already has. The
+  information is in how far it has drifted from the other two.</p>
+
+  <div class="cols">
+    <div class="card price">
+      <div class="k">layer one</div>
+      <h3>Price</h3>
+      <p>What already happened. It is a fact, it is free, and by the time a
+      chart looks obvious it is in the price.</p>
+    </div>
+    <div class="card money">
+      <div class="k">layer two</div>
+      <h3>Positioning</h3>
+      <p>What somebody paid to be right about. A trader who is long a stock and
+      quietly buying puts against it is telling you something they would not
+      post. That signal cost the person sending it money.</p>
+    </div>
+    <div class="card talk">
+      <div class="k">layer three</div>
+      <h3>Talk</h3>
+      <p>What people say will happen — free to produce, which is the whole
+      problem with it. It counts at half weight, never more, so a loud enough
+      crowd cannot outvote the people actually paying.</p>
+    </div>
+  </div>
+
+  <p style="margin-top:30px">Every layer is z-scored against the names scanned in
+  the same run, not against an absolute scale. A raw skew of 0.04 is neither
+  high nor low; it is high or low <em>for that name, today, against everything
+  else you could be looking at instead</em>. A utility and a biotech do not
+  share a scale, and neither does a sleepy Tuesday and the morning after a CPI
+  print.</p>
+</div></section>
+
+<section id="quadrants"><div class="wrap">
+  <div class="eyebrow">The four situations</div>
+  <h2>Crossing price against positioning</h2>
+  <p class="sub">The names describe what a person is <em>doing</em>, rather than
+  what the greeks say.</p>
+
+  <div class="quad">
+    <div class="h"></div><div class="h">price down</div><div class="h">price up</div>
+    <div class="h">calls bid</div>
+    <div class="live"><div class="n">Contrarian Bid</div>
+      <div class="d">Someone is paying for a bounce.</div></div>
+    <div><div class="n">Chase</div>
+      <div class="d">Trend confirmed, and crowded.</div></div>
+    <div class="h">puts bid</div>
+    <div><div class="n">Fear</div>
+      <div class="d">The market believes the drop.</div></div>
+    <div class="live2"><div class="n">Hedged Rally</div>
+      <div class="d">Holders are nervous.</div></div>
+  </div>
+
+  <p style="margin-top:26px">Two of these are agreement and two are
+  disagreement, and only the disagreements are the point. That is why the map
+  below shades two quadrants and leaves the other two plain: a name whose price
+  and options point the same way is the normal case, and giving it equal visual
+  weight would be giving equal weight to the boring half of the market.</p>
+</div></section>
+
+<section id="map"><div class="wrap">
+  <div class="eyebrow">Real output · a scan run on 26 August 2026</div>
+  <h2>The whole universe, not the top of it</h2>
+  <p class="sub">A ranked list says what to look at. It cannot say whether today
+  is unusual — five names above a divergence of 2 is either a market coming
+  apart or an ordinary Tuesday, and the top of a table looks identical either
+  way.</p>
+
+  <figure>
+    <div class="chart"><img src="media/quadrants.svg"
+      alt="Scatter plot of 43 stocks, price against options positioning, both z-scored. UPS, WMT, AAPL and RDDT sit in the upper-left quadrant where price is weak but calls are bid. UBER and CRM sit in the lower-right where price is strong but puts are bid. Most names cluster near the origin."></div>
+    <figcaption>43 names on one plot. A morning where everything sits in the
+    middle is a cloud around the origin; a morning where the options market has
+    stopped agreeing with price grows two diagonal wings. Generated by
+    <code>tradesights chart</code> — a standalone SVG, no plotting library and
+    nothing to install.</figcaption>
+  </figure>
+
+  <div style="margin-top:44px">
+    <div class="term">
+      <div class="bar"><i></i><i></i><i></i><span>tradesights scan</span></div>
+<pre><span class="p">$</span> <span class="hl">tradesights scan</span>
+<span class="dim">scanned 43 names, 43 with usable option chains</span>
+
+<span class="hl">1. UPS  down 9% vs the market, but call buyers are stepping in —
+   someone is paying for a bounce</span>
+   <span class="dim">· options market split — protection is being paid for while calls trade</span>
+   <span class="dim">divergence 3.55</span>
+
+<span class="hl">2. UBER  up 14% vs the market, but protection is being bought —
+   holders are nervous</span>
+   <span class="dim">divergence 3.12</span>
+
+<span class="hl">3. CRM  up 15% vs the market, but protection is being bought —
+   holders are nervous</span>
+   <span class="dim">divergence 2.77</span>
+
+<span class="dim">This is a screener. Every name above is a question, not a call.</span></pre>
+    </div>
+    <figcaption style="margin-top:14px">No greeks in the output. The tool does
+    the interpreting so the reader does not have to do it at seven in the
+    morning.</figcaption>
+  </div>
+</div></section>
+
+<section id="limits"><div class="wrap">
+  <div class="eyebrow">Sharp edges</div>
+  <h2>Where it will cut you</h2>
+  <p class="sub">A tool that tells you its own failure modes is more trustworthy
+  than one that does not.</p>
+
+  <ul class="plain">
+    <li><strong>Option chains are scraped, not licensed.</strong> They come from
+    Yahoo via <code>yfinance</code>, which breaks without warning and has no
+    support contract. A missing chain is reported as missing rather than guessed
+    around, so a morning where Yahoo is unhappy is a morning with a shorter
+    list.</li>
+    <li><strong>Skew is a crude proxy for positioning.</strong> It cannot see who
+    is on which side of a trade, or whether a put was bought as a hedge or sold
+    for income. It is directionally useful and it is not order flow.</li>
+    <li><strong>The talk layer needs credits.</strong> Without them it is absent,
+    and absent is scored as absent — never as neutral. A name nobody discussed
+    and a name nobody checked are different facts, and treating them the same
+    would invent divergence that is not there.</li>
+    <li><strong>Thin names produce nonsense.</strong> A stock with four option
+    contracts and no volume will happily generate a dramatic skew. There is a
+    liquidity floor, and names below it are dropped rather than ranked.</li>
+    <li><strong>The list is always relative.</strong> There is no absolute
+    "nothing is happening today" reading. If the whole market is calm, the
+    calmest names still rank — and the digest says so rather than pretending the
+    top name is urgent.</li>
+  </ul>
+
+  <div class="notrade" style="margin-top:36px">
+    <h3>It cannot trade</h3>
+    <p>There is no order execution in this repo and no path from it to a broker,
+    deliberately and permanently. It reads and it reports. It is also not
+    backtested and carries no performance claims — somebody else's six months of
+    trades is not evidence a method works, and there is no number here chosen to
+    make the idea sound better than it is.</p>
+  </div>
+</div></section>
+
+<section id="run"><div class="wrap">
+  <div class="eyebrow">Run it</div>
+  <h2>Four commands</h2>
+  <div class="term" style="margin-top:22px">
+    <div class="bar"><i></i><i></i><i></i><span>bash</span></div>
+<pre><span class="p">$</span> <span class="hl">git clone https://github.com/Clanker-Labs/tradesights &amp;&amp; cd tradesights</span>
+<span class="p">$</span> <span class="hl">uv sync</span>
+
+<span class="p">$</span> <span class="hl">tradesights scan</span>        <span class="dim"># which names disagree with themselves</span>
+<span class="p">$</span> <span class="hl">tradesights rotation</span>    <span class="dim"># where money is moving, by sector</span>
+<span class="p">$</span> <span class="hl">tradesights name NVDA</span>   <span class="dim"># everything known about one name</span>
+<span class="p">$</span> <span class="hl">tradesights chart</span>       <span class="dim"># the whole universe, as an SVG</span></pre>
+  </div>
+  <p style="margin-top:26px">It also ships an MCP server, so an agent can run
+  the scan and post the digest to a chat without a person opening anything.</p>
+</div></section>
+
+<footer><div class="wrap">
+  <p style="max-width:var(--measure)">The core idea — pull price and options
+  positioning for every name and pay attention where they disagree — is from
+  <a href="https://www.instagram.com/reel/DcRZLiegCdz/">@berttrading</a>,
+  including the four quadrant names. The social layer, the macro regime, the
+  plain-English digest and everything in the repo are ours.</p>
+  <p style="max-width:var(--measure);color:var(--muted)">Nothing here is
+  financial advice, and nothing here is a recommendation to buy or sell
+  anything. It is a screener that ranks disagreements.</p>
+  <div class="row" style="margin-top:26px">
+    <span>Clanker Labs</span>
+    <a href="https://github.com/Clanker-Labs/tradesights">Source</a>
+    <a href="https://clanker-labs.github.io/clanker-labs-public/">More from the lab</a>
+  </div>
+</div></footer>
+
+</body>
+</html>

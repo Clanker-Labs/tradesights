@@ -3,6 +3,7 @@
     tradesights rotation   where is money moving, by sector
     tradesights scan       which names disagree with themselves
     tradesights name NVDA  everything known about one name
+    tradesights chart      the whole universe, plotted, to see if today is unusual
 
 Output is a table meant to be read at seven in the morning by somebody who has
 not had coffee and does not want to interpret a chart.
@@ -109,6 +110,43 @@ def scan(
         console.print(f"   [dim]divergence {r.divergence:.2f}[/dim]\n")
 
     console.print("[dim]This is a screener. Every name above is a question, not a call.[/dim]")
+
+
+@app.command()
+def chart(
+    out: str = typer.Option("quadrants.svg", "--out", "-o", help="where to write the SVG"),
+    label: int = typer.Option(8, "--label", help="how many names to label"),
+    no_talk: bool = typer.Option(True, "--no-talk/--talk", help="skip the social layer"),
+    verbose: bool = typer.Option(False, "--verbose", "-v"),
+) -> None:
+    """Plot every scanned name, to answer the question the list cannot.
+
+    The ranked list says what to look at. It cannot say whether today is
+    unusual -- five names above a divergence of 2 is either a market coming
+    apart or an ordinary Tuesday, and the top of a table looks identical either
+    way. Plotting the whole universe shows the difference at a glance: a cloud
+    around the origin, or two diagonal wings.
+    """
+    from pathlib import Path
+
+    from tradesights.chart import quadrant_svg
+
+    _setup_logging(verbose)
+    prices, money, talk = _gather(LIQUID, with_talk=not no_talk)
+    rows = build_rows(prices, money, talk)
+    if not rows:
+        console.print("[yellow]Nothing to plot — no name had both price and options.[/]")
+        raise typer.Exit(1)
+
+    svg = quadrant_svg(rows, title=f"{len(rows)} names · price against positioning",
+                       label_top=label)
+    Path(out).write_text(svg)
+    spread = {q: sum(1 for r in rows if r.quadrant.value == q)
+              for q in {r.quadrant.value for r in rows}}
+    console.print(f"[green]{out}[/] — {len(rows)} names")
+    console.print("[dim]" + " · ".join(f"{v} {k.replace('_', ' ')}"
+                                       for k, v in sorted(spread.items(), key=lambda kv: -kv[1]))
+                  + "[/dim]")
 
 
 @app.command()
