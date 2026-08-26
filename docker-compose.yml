@@ -19,9 +19,20 @@ services:
     environment:
       TRADESIGHTS_MCP_PORT: ${TRADESIGHTS_MCP_PORT:-8094}
       TRADESIGHTS_TELEGRAM_CHAT: ${TRADESIGHTS_TELEGRAM_CHAT:-}
+      # The MCP's archive tools read and WRITE the same database as the
+      # dashboard, the CLI and the snapshot timer. Giving this mount to the
+      # dashboard alone -- which is what the first version did -- left the
+      # agent's tools reading an empty container-local database: it reported
+      # "0 sessions recorded" while the dashboard beside it showed the real
+      # archive, and `tradesights_record` wrote into a filesystem that dies on
+      # the next restart. Nothing errored. Both services need it or neither
+      # does.
+      TRADESIGHTS_DB: /archive/history.db
       FRED_API_KEY: ${FRED_API_KEY:-}
       NEWSAPI_API_KEY: ${NEWSAPI_API_KEY:-}
       TWITTERAPI_API_KEY: ${TWITTERAPI_API_KEY:-}
+    volumes:
+      - ${TRADESIGHTS_ARCHIVE:-./.archive}:/archive
     healthcheck:
       test: ["CMD-SHELL", 'curl -s -o /dev/null -w "%{http_code}" "http://127.0.0.1:${TRADESIGHTS_MCP_PORT:-8094}/mcp" | grep -qE "^(200|406)$$"']
       interval: 60s
@@ -54,7 +65,13 @@ services:
       # every other writer filled the real one.
       TRADESIGHTS_DB: /archive/history.db
     volumes:
-      - ${TRADESIGHTS_ARCHIVE:-~/.tradesights}:/archive
+      # NOT `~/.tradesights` as the fallback: compose does not expand a tilde in
+      # a volume source, it treats the whole thing as a relative path and
+      # silently creates a directory literally named `~` inside the repo. The
+      # archive would then be somewhere nobody looks, and everything would
+      # appear to work. chezmoi's 50-configure.sh writes an absolute path here;
+      # the fallback is repo-local and obvious.
+      - ${TRADESIGHTS_ARCHIVE:-./.archive}:/archive
     healthcheck:
       test: ["CMD-SHELL", 'curl -fsS "http://127.0.0.1:${TRADESIGHTS_DASHBOARD_PORT:-8095}/api/health" >/dev/null']
       interval: 60s
