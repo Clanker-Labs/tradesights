@@ -54,9 +54,19 @@ mcp = FastMCP(
         "Market disagreement: where price, options positioning and talk stop "
         "agreeing. Use `tradesights_digest` for the morning summary Erwin asks "
         "for, `tradesights_rotation` for where money is moving by sector, and "
-        "`tradesights_name` when he asks about one ticker. Everything here is a "
-        "SCREENER — say where to look, never what to buy, and never imply a "
-        "prediction. There is no tool here that can trade, by design."
+        "`tradesights_name` when he asks about one ticker.\n\n"
+        "The archive tools answer questions a single scan cannot. "
+        "`tradesights_track` says whether a name has been stretched for a "
+        "fortnight or arrived there this morning — check it before describing "
+        "any name as newly interesting. `tradesights_resolve` reports what "
+        "happened after past signals, and will usually answer that there is not "
+        "enough history yet; report that plainly rather than hunting for a "
+        "number. `tradesights_record` writes today's scan down and is the only "
+        "tool here that changes anything.\n\n"
+        "Everything here is a SCREENER — say where to look, never what to buy, "
+        "and never imply a prediction. There is no tool here that can trade, by "
+        "design. When quoting the archive, quote its caveats too: they are not "
+        "hedging, they are the finding."
     ),
 )
 
@@ -167,6 +177,162 @@ def tradesights_name(symbol: str) -> dict:
             "sentiment": round(t.sentiment, 3), "mentions": t.mentions, "source": t.source,
         },
         "caveat": "A screener. This says where to look, not what to do.",
+    }
+
+
+@mcp.tool
+def tradesights_track(symbol: str) -> dict:
+    """One name's readings across every stored session.
+
+    The question a single scan structurally cannot answer: has this been
+    stretched for a fortnight, or did it arrive there this morning? A name at
+    the top of today's list is a different proposition depending on the answer,
+    and the ranked list has no way to say which.
+
+    Returns an empty history rather than an error when nothing is stored — an
+    archive that has not been running is not a failure, it is a fact about how
+    long the tool has been recording.
+    """
+    from tradesights import store
+
+    symbol = symbol.upper().strip()
+    rows = store.history(symbol)
+    if not rows:
+        return {
+            "ok": True, "symbol": symbol, "sessions": 0, "history": [],
+            "note": ("nothing recorded for this name yet. The archive only grows "
+                     "forward — it cannot be backfilled, because option chains "
+                     "are not retrievable after the fact."),
+        }
+
+    latest = rows[-1]
+    streak = 0
+    for row in reversed(rows):
+        if row.quadrant != latest.quadrant:
+            break
+        streak += 1
+
+    return {
+        "ok": True,
+        "symbol": symbol,
+        "sessions": len(rows),
+        "latest": {
+            "session": latest.session, "quadrant": latest.quadrant,
+            "divergence": round(latest.divergence, 3),
+            "price_z": round(latest.price_z, 3),
+            "money_z": round(latest.money_z, 3),
+        },
+        "streak_sessions": streak,
+        "history": [
+            {"session": r.session, "quadrant": r.quadrant,
+             "divergence": round(r.divergence, 3)}
+            for r in rows
+        ],
+        "caveat": ("A long streak means the disagreement has persisted, not that "
+                   "it is about to resolve."),
+    }
+
+
+@mcp.tool
+def tradesights_resolve(horizon_days: int = 5) -> dict:
+    """What happened after past signals, grouped by quadrant.
+
+    Read the `edge` figure, not `mean_return`. Edge is a quadrant's average
+    forward return minus everything else's over the same sessions: in a rising
+    market every quadrant looks predictive, and subtracting the universe is the
+    only way to tell a signal from a tide.
+
+    `reasons_not_to_believe` is the important field and is usually non-empty.
+    For the first several months the honest answer is that there is not enough
+    archive, and this returns that rather than a confident percentage.
+    """
+    from tradesights import store
+
+    horizon_days = max(1, min(int(horizon_days), 60))
+    outcomes = store.resolve(horizon_days)
+    scores, reasons = store.score_quadrants(outcomes)
+
+    if not scores:
+        return {
+            "ok": True, "horizon_days": horizon_days, "resolved": 0,
+            "scores": [], "reasons_not_to_believe": reasons,
+            "note": ("nothing has resolved yet. Say so — do not go looking for a "
+                     "number somewhere else."),
+        }
+
+    return {
+        "ok": True,
+        "horizon_days": horizon_days,
+        "resolved": len(outcomes),
+        "sessions": len({o.session for o in outcomes}),
+        "scores": [
+            {"quadrant": s.quadrant, "n": s.n,
+             "mean_return": round(s.mean_return, 5),
+             "median_return": round(s.median_return, 5),
+             "hit_rate": round(s.hit_rate, 3),
+             "universe_baseline": round(s.baseline, 5),
+             "edge": round(s.edge, 5)}
+            for s in scores
+        ],
+        "reasons_not_to_believe": reasons,
+        "caveat": ("A forward return after a signal is not a trade. There is no "
+                   "entry rule, no stop, no size and no cost here, and the "
+                   "difference between a drift and a profit is every part of "
+                   "trading that is hard."),
+    }
+
+
+@mcp.tool
+def tradesights_archive() -> dict:
+    """What is in the archive, and whether it is enough to conclude anything."""
+    from tradesights import store
+
+    rows = store.sessions(limit=9999)
+    enough = len(rows) >= 30
+    return {
+        "ok": True,
+        "sessions": len(rows),
+        "first": rows[-1]["session"] if rows else None,
+        "latest": rows[0]["session"] if rows else None,
+        "enough_to_conclude": enough,
+        "note": (
+            "The archive is large enough that resolution figures are worth "
+            "reading, with their caveats." if enough else
+            f"{len(rows)} sessions. Thirty is six trading weeks, and every name "
+            "on the same day shares a market, so the effective sample grows far "
+            "more slowly than the row count suggests."
+        ),
+    }
+
+
+@mcp.tool
+def tradesights_record() -> dict:
+    """Write today's scan into the archive. The only tool here that changes state.
+
+    Slow — it pulls the full option-chain universe, the same as a scan. Call it
+    once a day at most; a session recorded twice replaces itself rather than
+    double-counting, but the minutes are still spent.
+
+    Normally a timer does this (see `deploy/` in the repo). Call it by hand when
+    the timer has not run and the day would otherwise be lost: option chains are
+    not retrievable after the fact, so a missed session is missed permanently.
+    """
+    from tradesights import store
+
+    rows = _scan(LIQUID, with_talk=False)
+    if not rows:
+        return {"ok": False,
+                "error": "no name had both price and options — nothing recorded"}
+
+    prices = fetch_prices([r.symbol for r in rows])
+    snapshot_id = store.save(rows, prices=prices,
+                             regime=macro.describe(macro.fetch_regime()))
+    stored = store.sessions(limit=9999)
+    return {
+        "ok": True, "snapshot": snapshot_id, "names": len(rows),
+        "sessions_stored": len(stored),
+        "note": ("Recorded. The archive only grows forward and says nothing "
+                 "useful for months."),
     }
 
 

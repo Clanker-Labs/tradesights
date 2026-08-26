@@ -1,4 +1,4 @@
-# The tradesights MCP server.
+# tradesights: the MCP server, and the research dashboard.
 #
 # network_mode: host for the same reason as the other MCP servers in this
 # ecosystem — LeClanker is on the bridge network and reaches these through
@@ -24,6 +24,39 @@ services:
       TWITTERAPI_API_KEY: ${TWITTERAPI_API_KEY:-}
     healthcheck:
       test: ["CMD-SHELL", 'curl -s -o /dev/null -w "%{http_code}" "http://127.0.0.1:${TRADESIGHTS_MCP_PORT:-8094}/mcp" | grep -qE "^(200|406)$$"']
+      interval: 60s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
+
+  # The research dashboard on :8095. Host namespace like the MCP, for a
+  # different reason: it reads the snapshot archive from a bind-mounted host
+  # directory, and the Tailscale sidecar in chezmoi proxies 127.0.0.1:8095 —
+  # both of which want the same network view as everything else on the box.
+  #
+  # It cannot place an order. No route takes a side or a size, and the module
+  # does not import anything that can send. That is the property that makes
+  # leaving it unauthenticated a defensible choice rather than an oversight —
+  # the worst outcome of an unexpected visitor is a stale chart.
+  tradesights-dashboard:
+    build: .
+    image: tradesights-mcp:latest
+    container_name: tradesights-dashboard
+    network_mode: host
+    restart: unless-stopped
+    command: ["python", "-m", "tradesights.cli", "dashboard",
+              "--host", "127.0.0.1", "--port", "${TRADESIGHTS_DASHBOARD_PORT:-8095}"]
+    environment:
+      # The archive is the whole point of the dashboard, and it lives on the
+      # host so that `tradesights snapshot` from a cron, from the CLI and from
+      # the container all write to the same database. A container-local path
+      # would give the dashboard a private, permanently empty archive while
+      # every other writer filled the real one.
+      TRADESIGHTS_DB: /archive/history.db
+    volumes:
+      - ${TRADESIGHTS_ARCHIVE:-~/.tradesights}:/archive
+    healthcheck:
+      test: ["CMD-SHELL", 'curl -fsS "http://127.0.0.1:${TRADESIGHTS_DASHBOARD_PORT:-8095}/api/health" >/dev/null']
       interval: 60s
       timeout: 5s
       start_period: 20s
