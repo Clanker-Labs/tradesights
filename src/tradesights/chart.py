@@ -34,23 +34,26 @@ from __future__ import annotations
 
 from tradesights.core.model import QUADRANT_SHORT, Quadrant
 
-#: Porchlight. See Clanker-Labs/branding · brand/palette.md.
-BG = "#101211"
-LINE = "#272b28"
-HEADING = "#e9ebe7"
-BODY = "#a9aea8"
-MUTED = "#7e847e"
-FAINT = "#636963"
-ACCENT = "#e79a4b"
+#: Unchained Labs. See Unchained-Labs/branding · brand/palette.md.
+#: Kept in step with the dashboard's CSS tokens — these render the same
+#: charts server-side, so a drift here shows up as two different palettes
+#: for the same data.
+BG = "#0F1419"
+LINE = "#232B35"
+HEADING = "#E8EDF2"
+BODY = "#A8B3BF"
+MUTED = "#7C8896"
+FAINT = "#5A6673"
+ACCENT = "#00D4AA"
 
 #: Status is a separate axis from accent and is never decorative. Here it is
 #: doing real work: the two quadrants where price and positioning DISAGREE are
 #: the subject of the tool, and they are the only ones that get a colour.
 QUADRANT_COLOUR = {
-    Quadrant.CONTRARIAN_BID: "#6fbf8b",   # price down, money bullish
-    Quadrant.HEDGED_RALLY: "#d4695f",     # price up, money bearish
-    Quadrant.CHASE: "#7e847e",            # both up: agreement, not news
-    Quadrant.FEAR: "#7e847e",             # both down: agreement, not news
+    Quadrant.CONTRARIAN_BID: "#4ADE80",   # price down, money bullish
+    Quadrant.HEDGED_RALLY: "#E5484D",     # price up, money bearish
+    Quadrant.CHASE: "#7C8896",            # both up: agreement, not news
+    Quadrant.FEAR: "#7C8896",             # both down: agreement, not news
     Quadrant.QUIET: "#4a504a",            # the middle, deliberately dim
 }
 
@@ -109,9 +112,9 @@ def quadrant_svg(rows, title: str = "", label_top: int = 8) -> str:
     # normal case and shading it would give equal visual weight to the boring
     # half of the plot.
     parts.append(f'<rect x="{PAD["l"]}" y="{PAD["t"]}" width="{cx-PAD["l"]:.1f}" '
-                 f'height="{cy-PAD["t"]:.1f}" fill="#6fbf8b" opacity="0.045"/>')
+                 f'height="{cy-PAD["t"]:.1f}" fill="#4ADE80" opacity="0.045"/>')
     parts.append(f'<rect x="{cx:.1f}" y="{cy:.1f}" width="{W-PAD["r"]-cx:.1f}" '
-                 f'height="{PAD["t"]+ih-cy:.1f}" fill="#d4695f" opacity="0.045"/>')
+                 f'height="{PAD["t"]+ih-cy:.1f}" fill="#E5484D" opacity="0.045"/>')
 
     for v in (-2, -1, 1, 2):
         if abs(v) > span:
@@ -127,10 +130,10 @@ def quadrant_svg(rows, title: str = "", label_top: int = 8) -> str:
                  f'stroke="{MUTED}" stroke-width="1"/>')
 
     corners = [
-        (PAD["l"] + 10, PAD["t"] + 20, "start", "someone is paying for a bounce", "#6fbf8b"),
+        (PAD["l"] + 10, PAD["t"] + 20, "start", "someone is paying for a bounce", "#4ADE80"),
         (W - PAD["r"] - 10, PAD["t"] + 20, "end", "price and options agree", MUTED),
         (PAD["l"] + 10, PAD["t"] + ih - 12, "start", "price and options agree", MUTED),
-        (W - PAD["r"] - 10, PAD["t"] + ih - 10, "end", "holders are nervous", "#d4695f"),
+        (W - PAD["r"] - 10, PAD["t"] + ih - 10, "end", "holders are nervous", "#E5484D"),
     ]
     for x, y, anchor, text, colour in corners:
         parts.append(f'<text x="{x:.0f}" y="{y:.0f}" fill="{colour}" font-size="10.5" '
