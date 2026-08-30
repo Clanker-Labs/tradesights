@@ -1,75 +1,75 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 620" width="760" height="620" font-family="JetBrains Mono, ui-monospace, monospace" role="img" aria-label="Price against options positioning for 43 names, z-scored against each other">
-<rect width="760" height="620" fill="#101211"/>
-<text x="62" y="34" fill="#e9ebe7" font-size="17">43 names · price against positioning</text>
-<text x="62" y="54" fill="#636963" font-size="11">every name scanned, z-scored against the others in the same run</text>
-<rect x="62" y="76" width="332.0" height="241.0" fill="#6fbf8b" opacity="0.045"/>
-<rect x="394.0" y="317.0" width="332.0" height="241.0" fill="#d4695f" opacity="0.045"/>
-<line x1="167.9" y1="76" x2="167.9" y2="558" stroke="#272b28" stroke-width="1"/>
-<line x1="62" y1="481.1" x2="726" y2="481.1" stroke="#272b28" stroke-width="1"/>
-<line x1="281.0" y1="76" x2="281.0" y2="558" stroke="#272b28" stroke-width="1"/>
-<line x1="62" y1="399.1" x2="726" y2="399.1" stroke="#272b28" stroke-width="1"/>
-<line x1="507.0" y1="76" x2="507.0" y2="558" stroke="#272b28" stroke-width="1"/>
-<line x1="62" y1="234.9" x2="726" y2="234.9" stroke="#272b28" stroke-width="1"/>
-<line x1="620.1" y1="76" x2="620.1" y2="558" stroke="#272b28" stroke-width="1"/>
-<line x1="62" y1="152.9" x2="726" y2="152.9" stroke="#272b28" stroke-width="1"/>
-<line x1="62" y1="317.0" x2="726" y2="317.0" stroke="#7e847e" stroke-width="1"/>
-<line x1="394.0" y1="76" x2="394.0" y2="558" stroke="#7e847e" stroke-width="1"/>
-<text x="72" y="96" fill="#6fbf8b" font-size="10.5" text-anchor="start" opacity="0.9">someone is paying for a bounce</text>
-<text x="716" y="96" fill="#7e847e" font-size="10.5" text-anchor="end" opacity="0.9">price and options agree</text>
-<text x="72" y="546" fill="#7e847e" font-size="10.5" text-anchor="start" opacity="0.9">price and options agree</text>
-<text x="716" y="548" fill="#d4695f" font-size="10.5" text-anchor="end" opacity="0.9">holders are nervous</text>
+<rect width="760" height="620" fill="#0F1419"/>
+<text x="62" y="34" fill="#E8EDF2" font-size="17">43 names · price against positioning</text>
+<text x="62" y="54" fill="#5A6673" font-size="11">every name scanned, z-scored against the others in the same run</text>
+<rect x="62" y="76" width="332.0" height="241.0" fill="#4ADE80" opacity="0.045"/>
+<rect x="394.0" y="317.0" width="332.0" height="241.0" fill="#E5484D" opacity="0.045"/>
+<line x1="167.9" y1="76" x2="167.9" y2="558" stroke="#232B35" stroke-width="1"/>
+<line x1="62" y1="481.1" x2="726" y2="481.1" stroke="#232B35" stroke-width="1"/>
+<line x1="281.0" y1="76" x2="281.0" y2="558" stroke="#232B35" stroke-width="1"/>
+<line x1="62" y1="399.1" x2="726" y2="399.1" stroke="#232B35" stroke-width="1"/>
+<line x1="507.0" y1="76" x2="507.0" y2="558" stroke="#232B35" stroke-width="1"/>
+<line x1="62" y1="234.9" x2="726" y2="234.9" stroke="#232B35" stroke-width="1"/>
+<line x1="620.1" y1="76" x2="620.1" y2="558" stroke="#232B35" stroke-width="1"/>
+<line x1="62" y1="152.9" x2="726" y2="152.9" stroke="#232B35" stroke-width="1"/>
+<line x1="62" y1="317.0" x2="726" y2="317.0" stroke="#7C8896" stroke-width="1"/>
+<line x1="394.0" y1="76" x2="394.0" y2="558" stroke="#7C8896" stroke-width="1"/>
+<text x="72" y="96" fill="#4ADE80" font-size="10.5" text-anchor="start" opacity="0.9">someone is paying for a bounce</text>
+<text x="716" y="96" fill="#7C8896" font-size="10.5" text-anchor="end" opacity="0.9">price and options agree</text>
+<text x="72" y="546" fill="#7C8896" font-size="10.5" text-anchor="start" opacity="0.9">price and options agree</text>
+<text x="716" y="548" fill="#E5484D" font-size="10.5" text-anchor="end" opacity="0.9">holders are nervous</text>
 <circle cx="378.9" cy="329.8" r="3.2" fill="#4a504a" opacity="0.5"/>
-<circle cx="339.5" cy="354.7" r="3.2" fill="#7e847e" opacity="0.5"/>
-<circle cx="300.4" cy="389.0" r="3.2" fill="#7e847e" opacity="0.5"/>
-<circle cx="527.0" cy="234.0" r="3.2" fill="#7e847e" opacity="0.5"/>
+<circle cx="339.5" cy="354.7" r="3.2" fill="#7C8896" opacity="0.5"/>
+<circle cx="300.4" cy="389.0" r="3.2" fill="#7C8896" opacity="0.5"/>
+<circle cx="527.0" cy="234.0" r="3.2" fill="#7C8896" opacity="0.5"/>
 <circle cx="374.1" cy="349.4" r="3.2" fill="#4a504a" opacity="0.5"/>
 <circle cx="408.2" cy="288.2" r="3.2" fill="#4a504a" opacity="0.5"/>
 <circle cx="343.9" cy="334.5" r="3.2" fill="#4a504a" opacity="0.5"/>
-<circle cx="482.2" cy="283.2" r="3.2" fill="#7e847e" opacity="0.5"/>
+<circle cx="482.2" cy="283.2" r="3.2" fill="#7C8896" opacity="0.5"/>
 <circle cx="406.9" cy="339.2" r="3.2" fill="#4a504a" opacity="0.5"/>
-<circle cx="258.1" cy="381.9" r="3.2" fill="#7e847e" opacity="0.5"/>
+<circle cx="258.1" cy="381.9" r="3.2" fill="#7C8896" opacity="0.5"/>
 <circle cx="487.3" cy="289.2" r="3.2" fill="#4a504a" opacity="0.5"/>
 <circle cx="373.6" cy="373.8" r="3.2" fill="#4a504a" opacity="0.5"/>
-<circle cx="515.8" cy="186.2" r="3.2" fill="#7e847e" opacity="0.5"/>
-<circle cx="504.8" cy="280.6" r="3.2" fill="#7e847e" opacity="0.5"/>
-<circle cx="281.2" cy="352.2" r="3.2" fill="#7e847e" opacity="0.5"/>
+<circle cx="515.8" cy="186.2" r="3.2" fill="#7C8896" opacity="0.5"/>
+<circle cx="504.8" cy="280.6" r="3.2" fill="#7C8896" opacity="0.5"/>
+<circle cx="281.2" cy="352.2" r="3.2" fill="#7C8896" opacity="0.5"/>
 <circle cx="302.1" cy="336.5" r="3.2" fill="#4a504a" opacity="0.5"/>
-<circle cx="260.2" cy="360.0" r="3.2" fill="#7e847e" opacity="0.5"/>
+<circle cx="260.2" cy="360.0" r="3.2" fill="#7C8896" opacity="0.5"/>
 <circle cx="388.2" cy="263.1" r="3.2" fill="#4a504a" opacity="0.5"/>
-<circle cx="559.0" cy="263.8" r="3.2" fill="#7e847e" opacity="0.5"/>
+<circle cx="559.0" cy="263.8" r="3.2" fill="#7C8896" opacity="0.5"/>
 <circle cx="266.9" cy="339.6" r="3.2" fill="#4a504a" opacity="0.5"/>
 <circle cx="432.7" cy="219.0" r="3.2" fill="#4a504a" opacity="0.5"/>
-<circle cx="507.9" cy="164.1" r="3.2" fill="#7e847e" opacity="0.5"/>
+<circle cx="507.9" cy="164.1" r="3.2" fill="#7C8896" opacity="0.5"/>
 <circle cx="349.4" cy="421.1" r="3.2" fill="#4a504a" opacity="0.5"/>
 <circle cx="470.1" cy="341.7" r="3.2" fill="#4a504a" opacity="0.5"/>
 <circle cx="327.3" cy="284.4" r="3.2" fill="#4a504a" opacity="0.5"/>
 <circle cx="275.2" cy="321.6" r="3.2" fill="#4a504a" opacity="0.5"/>
-<circle cx="335.7" cy="265.3" r="3.2" fill="#6fbf8b" opacity="0.5"/>
-<circle cx="347.9" cy="455.3" r="3.2" fill="#7e847e" opacity="0.5"/>
+<circle cx="335.7" cy="265.3" r="3.2" fill="#4ADE80" opacity="0.5"/>
+<circle cx="347.9" cy="455.3" r="3.2" fill="#7C8896" opacity="0.5"/>
 <circle cx="435.2" cy="406.3" r="3.2" fill="#4a504a" opacity="0.5"/>
 <circle cx="354.1" cy="466.8" r="3.2" fill="#4a504a" opacity="0.5"/>
-<circle cx="292.8" cy="266.1" r="3.2" fill="#6fbf8b" opacity="0.5"/>
-<circle cx="286.5" cy="267.4" r="3.2" fill="#6fbf8b" opacity="0.5"/>
-<circle cx="343.4" cy="221.6" r="3.2" fill="#6fbf8b" opacity="0.5"/>
+<circle cx="292.8" cy="266.1" r="3.2" fill="#4ADE80" opacity="0.5"/>
+<circle cx="286.5" cy="267.4" r="3.2" fill="#4ADE80" opacity="0.5"/>
+<circle cx="343.4" cy="221.6" r="3.2" fill="#4ADE80" opacity="0.5"/>
 <circle cx="407.2" cy="468.3" r="3.2" fill="#4a504a" opacity="0.5"/>
-<circle cx="571.3" cy="362.1" r="3.2" fill="#d4695f" opacity="0.5"/>
-<circle cx="276.4" cy="226.8" r="5.5" fill="#6fbf8b" opacity="0.95"/>
-<text x="286.4" y="230.8" fill="#e9ebe7" font-size="12" text-anchor="start">WMT</text>
+<circle cx="571.3" cy="362.1" r="3.2" fill="#E5484D" opacity="0.5"/>
+<circle cx="276.4" cy="226.8" r="5.5" fill="#4ADE80" opacity="0.95"/>
+<text x="286.4" y="230.8" fill="#E8EDF2" font-size="12" text-anchor="start">WMT</text>
 <circle cx="637.4" cy="323.3" r="5.5" fill="#4a504a" opacity="0.95"/>
-<text x="627.4" y="327.3" fill="#e9ebe7" font-size="12" text-anchor="end">MSFT</text>
-<circle cx="248.6" cy="235.9" r="5.5" fill="#6fbf8b" opacity="0.95"/>
-<text x="258.6" y="239.9" fill="#e9ebe7" font-size="12" text-anchor="start">AAPL</text>
-<circle cx="232.6" cy="245.5" r="5.5" fill="#6fbf8b" opacity="0.95"/>
-<text x="242.6" y="249.5" fill="#e9ebe7" font-size="12" text-anchor="start">RDDT</text>
+<text x="627.4" y="327.3" fill="#E8EDF2" font-size="12" text-anchor="end">MSFT</text>
+<circle cx="248.6" cy="235.9" r="5.5" fill="#4ADE80" opacity="0.95"/>
+<text x="258.6" y="239.9" fill="#E8EDF2" font-size="12" text-anchor="start">AAPL</text>
+<circle cx="232.6" cy="245.5" r="5.5" fill="#4ADE80" opacity="0.95"/>
+<text x="242.6" y="249.5" fill="#E8EDF2" font-size="12" text-anchor="start">RDDT</text>
 <circle cx="690.4" cy="326.5" r="5.5" fill="#4a504a" opacity="0.95"/>
-<text x="680.4" y="330.5" fill="#e9ebe7" font-size="12" text-anchor="end">PLTR</text>
-<circle cx="546.0" cy="434.3" r="5.5" fill="#d4695f" opacity="0.95"/>
-<text x="536.0" y="438.3" fill="#e9ebe7" font-size="12" text-anchor="end">CRM</text>
-<circle cx="538.8" cy="467.8" r="5.5" fill="#d4695f" opacity="0.95"/>
-<text x="528.8" y="471.8" fill="#e9ebe7" font-size="12" text-anchor="end">UBER</text>
-<circle cx="276.8" cy="111.1" r="5.5" fill="#6fbf8b" opacity="0.95"/>
-<text x="286.8" y="115.1" fill="#e9ebe7" font-size="12" text-anchor="start">UPS</text>
-<text x="726" y="584" fill="#7e847e" font-size="11" text-anchor="end">← weaker   price vs the market   stronger →</text>
-<text x="38" y="317" fill="#7e847e" font-size="11" text-anchor="middle" transform="rotate(-90 38 317)">← bearish   options positioning   bullish →</text>
-<text x="62" y="604" fill="#636963" font-size="10.5">43 names · the middle is deliberately unnamed</text>
+<text x="680.4" y="330.5" fill="#E8EDF2" font-size="12" text-anchor="end">PLTR</text>
+<circle cx="546.0" cy="434.3" r="5.5" fill="#E5484D" opacity="0.95"/>
+<text x="536.0" y="438.3" fill="#E8EDF2" font-size="12" text-anchor="end">CRM</text>
+<circle cx="538.8" cy="467.8" r="5.5" fill="#E5484D" opacity="0.95"/>
+<text x="528.8" y="471.8" fill="#E8EDF2" font-size="12" text-anchor="end">UBER</text>
+<circle cx="276.8" cy="111.1" r="5.5" fill="#4ADE80" opacity="0.95"/>
+<text x="286.8" y="115.1" fill="#E8EDF2" font-size="12" text-anchor="start">UPS</text>
+<text x="726" y="584" fill="#7C8896" font-size="11" text-anchor="end">← weaker   price vs the market   stronger →</text>
+<text x="38" y="317" fill="#7C8896" font-size="11" text-anchor="middle" transform="rotate(-90 38 317)">← bearish   options positioning   bullish →</text>
+<text x="62" y="604" fill="#5A6673" font-size="10.5">43 names · the middle is deliberately unnamed</text>
 </svg>

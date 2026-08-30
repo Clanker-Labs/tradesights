@@ -35,10 +35,10 @@ app = FastAPI(title="tradesights", docs_url="/api/docs",
 #: quadrants where price and positioning DISAGREE are the subject of the tool;
 #: the two where they agree are the normal case and stay grey.
 QUADRANT_META = {
-    Quadrant.CONTRARIAN_BID.value: {"colour": "#6fbf8b", "disagreement": True},
-    Quadrant.HEDGED_RALLY.value: {"colour": "#d4695f", "disagreement": True},
-    Quadrant.CHASE.value: {"colour": "#7e847e", "disagreement": False},
-    Quadrant.FEAR.value: {"colour": "#7e847e", "disagreement": False},
+    Quadrant.CONTRARIAN_BID.value: {"colour": "#4ADE80", "disagreement": True},
+    Quadrant.HEDGED_RALLY.value: {"colour": "#E5484D", "disagreement": True},
+    Quadrant.CHASE.value: {"colour": "#7C8896", "disagreement": False},
+    Quadrant.FEAR.value: {"colour": "#7C8896", "disagreement": False},
     Quadrant.QUIET.value: {"colour": "#4a504a", "disagreement": False},
 }
 
@@ -56,7 +56,7 @@ def _observation(o: store.Observation) -> dict:
         "divergence": round(o.divergence, 4),
         "positioning_conflict": round(o.positioning_conflict, 4),
         "price": round(o.price, 4),
-        "colour": meta.get("colour", "#7e847e"),
+        "colour": meta.get("colour", "#7C8896"),
         "disagreement": meta.get("disagreement", False),
     }
 
@@ -137,7 +137,7 @@ def api_resolve(horizon: int = Query(5, ge=1, le=60)) -> dict:
         "scores": [
             {"quadrant": s.quadrant,
              "short": QUADRANT_SHORT[Quadrant(s.quadrant)],
-             "colour": QUADRANT_META.get(s.quadrant, {}).get("colour", "#7e847e"),
+             "colour": QUADRANT_META.get(s.quadrant, {}).get("colour", "#7C8896"),
              "n": s.n, "mean_return": s.mean_return,
              "median_return": s.median_return, "hit_rate": s.hit_rate,
              "baseline": s.baseline, "edge": s.edge}
