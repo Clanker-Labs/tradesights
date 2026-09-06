@@ -48,6 +48,11 @@ PORT = int(os.environ.get("TRADESIGHTS_MCP_PORT", "8094"))
 #: the digest came back with nowhere to go.
 TELEGRAM_CHAT = os.environ.get("TRADESIGHTS_TELEGRAM_CHAT") or "-1004498770577"
 
+#: Leveraged funds and the index each one actually tracks. Kept in step with
+#: dashboard/server.py: both read the same core, and a fund in one list and not
+#: the other is a tool that answers for the dashboard and 404s for the agent.
+LEVERAGED_UNDERLYING = {"TQQQ": "QQQ", "UPRO": "SPY", "SOXL": "SOXX", "QLD": "QQQ"}
+
 mcp = FastMCP(
     "tradesights",
     instructions=(
@@ -334,6 +339,47 @@ def tradesights_record() -> dict:
         "note": ("Recorded. The archive only grows forward and says nothing "
                  "useful for months."),
     }
+
+
+@mcp.tool
+def tradesights_trend(symbol: str = "TQQQ") -> dict:
+    """The 200-day rule for a leveraged ETF, with what would make it wrong.
+
+    Use this for "what is TQQQ doing", "should I be in TQQQ", or the daily
+    leveraged check. Known funds: TQQQ, UPRO, SOXL, QLD.
+
+    Read the whole thing before summarising, and carry `notes` through — they
+    are the conditions under which the rule fails, and a stance quoted without
+    them is the half that gets somebody hurt. Say "the rule says", not "you
+    should": this is a mechanical readout of two moving averages, there is no
+    order execution anywhere in this repo, and the strategy is well known to
+    whipsaw near the line.
+
+    Every signal is computed on the UNDERLYING index, never on the leveraged
+    fund itself — a 3x fund's own moving average moves with volatility decay as
+    well as with the market, so a crossing of it can mean nothing happened.
+    """
+    from tradesights.core import trend as trendmod
+    from tradesights.ingest.market import fetch_history
+
+    sym = (symbol or "TQQQ").upper().strip()
+    under = LEVERAGED_UNDERLYING.get(sym)
+    if under is None:
+        return {"error": f"{sym} is not known here. Try: "
+                         + ", ".join(sorted(LEVERAGED_UNDERLYING))}
+    series = fetch_history([sym, under])
+    reading = trendmod.evaluate(
+        symbol=sym, underlying=under,
+        closes=(series.get(sym) or {}).get("closes") or [],
+        under_closes=(series.get(under) or {}).get("closes") or [],
+        dates=(series.get(under) or {}).get("dates") or [],
+    )
+    out = reading.as_dict()
+    # The chart series is for the browser. Sending 260 points into a model's
+    # context costs tokens and tells it nothing the numbers do not.
+    out.pop("history", None)
+    return out
+
 
 
 if __name__ == "__main__":

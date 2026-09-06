@@ -258,3 +258,49 @@ def fetch_options(symbol: str, horizon_days: int = 30) -> MoneyLayer | None:
 
 __all__ = ["MIN_CONTRACTS", "MIN_VOLUME_FOR_RATIO", "MoneyLayer", "PriceLayer",
            "fetch_options", "fetch_prices"]
+
+
+def fetch_history(symbols: list[str], period: str = "3y") -> dict[str, dict]:
+    """Daily closes far enough back to run a 200-day average on.
+
+    `fetch_prices` above pulls two months, which is right for the screener and
+    useless here: a 200-day moving average needs 200 days before it exists at
+    all, and a year on either side of it before the chart says anything about
+    trend. Separate function rather than a parameter, because the two callers
+    want different shapes — that one returns relative performance, this one
+    returns the series.
+    """
+    import yfinance as yf
+
+    wanted = list(dict.fromkeys(symbols))
+    try:
+        raw = yf.download(wanted, period=period, interval="1d",
+                          progress=False, auto_adjust=True, threads=True)
+    except Exception:  # noqa: BLE001 - the source is scraped; any failure is possible
+        logger.warning("history download failed entirely", exc_info=True)
+        return {}
+    if raw is None or raw.empty:
+        logger.warning("history download returned nothing")
+        return {}
+
+    # Same MultiIndex-versus-flat problem as fetch_prices: yfinance returns one
+    # shape for several symbols and another for one, and this is the path every
+    # number below comes from.
+    out: dict[str, dict] = {}
+    for symbol in wanted:
+        try:
+            if isinstance(raw.columns, __import__("pandas").MultiIndex):
+                series = raw["Close"][symbol]
+            else:
+                series = raw["Close"]
+        except (KeyError, IndexError):
+            logger.warning("no close series for %s", symbol)
+            continue
+        series = series.dropna()
+        if series.empty:
+            continue
+        out[symbol] = {
+            "dates": [d.strftime("%Y-%m-%d") for d in series.index],
+            "closes": [float(v) for v in series.to_numpy()],
+        }
+    return out

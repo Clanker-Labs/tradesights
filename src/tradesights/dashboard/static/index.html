@@ -114,6 +114,41 @@ tbody tr:hover,tbody tr.on{background:var(--accent-soft)}
 svg text{font-family:var(--mono);font-size:10px;fill:var(--faint)}
 footer{color:var(--faint);font-size:12px;border-top:1px solid var(--line);
   padding-top:16px;margin-top:26px;max-width:86ch;line-height:1.6}
+
+/* ---- leveraged tab ---------------------------------------------------- */
+.levhead{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap}
+.levpick{display:flex;gap:6px;flex-wrap:wrap}
+.levpick button{background:transparent;border:1px solid #232B35;color:#A8B3BF;
+  border-radius:8px;padding:5px 11px;font:inherit;font-size:12.5px;cursor:pointer}
+.levpick button:hover{border-color:#00A888}
+.levpick button.on{background:rgba(0,212,170,.12);border-color:#00D4AA;color:#00D4AA;font-weight:600}
+/* The stance is the one thing you should be able to read from across the room,
+   and "marginal" has to be visible on it — a signal 0.2% from the line is not
+   the same claim as one 8% above it. */
+.stance{font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
+  padding:5px 12px;border-radius:999px;border:1px solid}
+.stance.on{color:#4ADE80;border-color:#4ADE80;background:rgba(74,222,128,.10)}
+.stance.off{color:#DE7D80;border-color:#DE7D80;background:rgba(229,72,77,.10)}
+.stance.none{color:#7C8896;border-color:#313B47}
+.levhead2{margin:14px 0 6px;font-size:1.15rem;line-height:1.35}
+.levsub{margin:0 0 16px;color:#7C8896;font-size:12.5px;line-height:1.55;max-width:78ch}
+.levchart{width:100%;height:auto;display:block;margin:4px 0 8px}
+.legend{display:flex;gap:16px;flex-wrap:wrap;font-size:11.5px;color:#7C8896;margin-bottom:18px}
+.legend i{display:inline-block;width:11px;height:3px;border-radius:2px;margin-right:6px;
+  vertical-align:middle}
+.lstats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}
+.lstat{border:1px solid #232B35;border-radius:10px;padding:10px 12px;background:#131a21}
+.lk{font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;color:#5A6673;font-weight:600}
+.lv{font-size:1.25rem;font-weight:700;margin-top:4px;color:#E8EDF2}
+.lh{font-size:11px;color:#7C8896;margin-top:2px}
+/* The notes are the honest half. They are not a footnote and are not styled
+   like one. */
+.lnotes{margin-top:20px;border-left:2px solid #E8B339;padding-left:14px}
+.lnotes h3{margin:0 0 8px;font-size:12px;letter-spacing:.07em;text-transform:uppercase;
+  color:#E8B339}
+.lnotes ul{margin:0;padding-left:18px}
+.lnotes li{color:#A8B3BF;font-size:13px;line-height:1.6;margin-bottom:6px}
+.levfoot{margin-top:20px;color:#5A6673;font-size:11.5px;line-height:1.6;max-width:80ch}
 </style>
 </head>
 <body>
@@ -135,6 +170,7 @@ footer{color:var(--faint);font-size:12px;border-top:1px solid var(--line);
   <button data-tab="list">Ranked</button>
   <button data-tab="resolve">Did it go anywhere</button>
   <button data-tab="archive">Archive</button>
+  <button data-tab="lev">Leveraged</button>
 </nav>
 
 <div id="out"><p class="empty">Loading…</p></div>
@@ -491,6 +527,7 @@ async function renderArchive(){
 
 /* ---------- shell ------------------------------------------------------ */
 function render(){
+  if(TAB === "lev") return renderLev();
   if(TAB === "resolve") return renderResolve();
   if(TAB === "archive") return renderArchive();
   if(!SNAP){
@@ -503,6 +540,161 @@ function render(){
     return;
   }
   (TAB === "map" ? renderMap : renderList)();
+}
+
+/* ---------- leveraged: the 200-day rule -------------------------------- *
+ *
+ * Every signal on this tab is computed on the UNDERLYING index, not on the
+ * leveraged fund. TQQQ is 3x DAILY, so its own moving average drifts down with
+ * volatility decay and a crossing of it can be produced by the decay rather
+ * than by anything the NASDAQ did. The server does that; the chart draws it, so
+ * what you see is what the rule read.
+ *
+ * The chart is price against its two averages and nothing else. This repo
+ * argues elsewhere that a price chart is the layer everyone already has — true
+ * for the screener, where the interesting thing is the distance between price
+ * and positioning. It is not true here: the rule IS a statement about a price
+ * and a line, and drawing it is the only way to see whether today is a clean
+ * trend or the fourth crossing this quarter.
+ */
+let LEV_SYM = "TQQQ", LEV = null;
+
+function levLine(pts, key, W, H, P, lo, hi, colour, dash){
+  const n = pts.length;
+  const X = i => P.l + (i / Math.max(1, n - 1)) * (W - P.l - P.r);
+  const Y = v => P.t + (H - P.t - P.b) * (1 - (v - lo) / Math.max(1e-9, hi - lo));
+  let d = "", pen = false;
+  pts.forEach((pt, i) => {
+    const v = pt[key];
+    // A gap is a gap. The 200-day average does not exist for the first 200
+    // points, and joining across that would draw a line nobody computed.
+    if(v === null || v === undefined){ pen = false; return; }
+    d += (pen ? "L" : "M") + X(i).toFixed(1) + " " + Y(v).toFixed(1) + " ";
+    pen = true;
+  });
+  return `<path d="${d}" fill="none" stroke="${colour}" stroke-width="${dash?1.4:2}"
+    ${dash ? `stroke-dasharray="${dash}"` : ""} stroke-linejoin="round"/>`;
+}
+
+function levChart(r){
+  const pts = r.history || [];
+  if(pts.length < 2) return `<p class="empty">Not enough history to draw.</p>`;
+  const W = 900, H = 340, P = {t:18, r:16, b:26, l:56};
+  const vals = [];
+  pts.forEach(p => ["u","slow","fast"].forEach(k => {
+    if(p[k] !== null && p[k] !== undefined) vals.push(p[k]);
+  }));
+  const lo = Math.min(...vals) * 0.985, hi = Math.max(...vals) * 1.015;
+  const X = i => P.l + (i / Math.max(1, pts.length - 1)) * (W - P.l - P.r);
+  const Y = v => P.t + (H - P.t - P.b) * (1 - (v - lo) / Math.max(1e-9, hi - lo));
+
+  let grid = "";
+  for(let g = 0; g <= 4; g++){
+    const v = lo + (hi - lo) * g / 4, y = Y(v);
+    grid += `<line x1="${P.l}" y1="${y.toFixed(1)}" x2="${W-P.r}" y2="${y.toFixed(1)}"
+      stroke="#232B35" stroke-width="1"/>
+      <text x="${P.l-8}" y="${(y+4).toFixed(1)}" text-anchor="end" fill="#5A6673"
+        font-size="10">${v.toFixed(0)}</text>`;
+  }
+  // Where the rule last changed its mind, marked. The eye finds a crossing
+  // faster than a number describing one.
+  let marks = "";
+  for(let i = 1; i < pts.length; i++){
+    const a = pts[i-1], b = pts[i];
+    if(a.slow == null || b.slow == null) continue;
+    if((a.u > a.slow) !== (b.u > b.slow)){
+      marks += `<line x1="${X(i).toFixed(1)}" y1="${P.t}" x2="${X(i).toFixed(1)}"
+        y2="${H-P.b}" stroke="#E8B339" stroke-width="1" stroke-dasharray="2 4" opacity=".55"/>`;
+    }
+  }
+  const first = pts[0].t || "", last = pts[pts.length-1].t || "";
+  return `<svg viewBox="0 0 ${W} ${H}" class="levchart" role="img"
+      aria-label="${esc(r.underlying)} against its 50- and 200-day averages">
+    ${grid}${marks}
+    ${levLine(pts, "slow", W, H, P, lo, hi, "#00D4AA", "")}
+    ${levLine(pts, "fast", W, H, P, lo, hi, "#7C8896", "5 4")}
+    ${levLine(pts, "u", W, H, P, lo, hi, "#E8EDF2", "")}
+    <text x="${P.l}" y="${H-8}" fill="#5A6673" font-size="10">${esc(first)}</text>
+    <text x="${W-P.r}" y="${H-8}" text-anchor="end" fill="#5A6673" font-size="10">${esc(last)}</text>
+  </svg>
+  <div class="legend">
+    <span><i style="background:#E8EDF2"></i>${esc(r.underlying)}</span>
+    <span><i style="background:#00D4AA"></i>200-day</span>
+    <span><i style="background:#7C8896"></i>50-day</span>
+    <span><i style="background:#E8B339"></i>crossing</span>
+  </div>`;
+}
+
+function levStat(label, value, hint){
+  return `<div class="lstat"><div class="lk">${esc(label)}</div>
+    <div class="lv">${value}</div>
+    ${hint ? `<div class="lh">${esc(hint)}</div>` : ""}</div>`;
+}
+
+async function renderLev(){
+  out.innerHTML = `<p class="empty">Reading ${esc(LEV_SYM)}…</p>`;
+  let r;
+  try{
+    r = await (await fetch("/api/trend/" + encodeURIComponent(LEV_SYM))).json();
+  }catch(e){
+    out.innerHTML = `<div class="panel"><h2>Could not reach the market</h2>
+      <p class="empty">${esc(e.message)}</p></div>`;
+    return;
+  }
+  if(r.detail){
+    out.innerHTML = `<div class="panel"><h2>Unknown fund</h2><p class="empty">${esc(r.detail)}</p></div>`;
+    return;
+  }
+  LEV = r;
+
+  const dist = r.distance == null ? "—" : pct(r.distance, 1);
+  const stanceCls = r.stance === "risk-on" ? "on" : r.stance === "risk-off" ? "off" : "none";
+  const picker = (r.universe || [LEV_SYM]).map(sym =>
+    `<button data-lev="${esc(sym)}" class="${sym === LEV_SYM ? "on" : ""}">${esc(sym)}</button>`).join("");
+
+  out.innerHTML = `
+    <div class="panel">
+      <div class="levhead">
+        <div class="levpick">${picker}</div>
+        <div class="stance ${stanceCls}">${esc(r.stance || "no signal")}${
+          r.confidence === "marginal" ? " · marginal" : ""}</div>
+      </div>
+      <h2 class="levhead2">${esc(r.headline || "")}</h2>
+      <p class="levsub">Signal computed on <b>${esc(r.underlying)}</b>, applied to
+        <b>${esc(r.symbol)}</b>. A 3x fund's own average moves with decay as well as
+        with the market, so reading it would answer a different question.
+        ${r.as_of ? "Close of " + esc(r.as_of) + "." : ""}</p>
+
+      ${levChart(r)}
+
+      <div class="lstats">
+        ${levStat("vs 200-day", dist, r.proximity || "")}
+        ${levStat("RSI(14)", r.rsi == null ? "—" : r.rsi.toFixed(0),
+                  r.rsi == null ? "" : r.rsi >= 70 ? "extended" : r.rsi <= 30 ? "oversold" : "neutral")}
+        ${levStat("MACD hist", r.macd && r.macd.histogram != null ? r.macd.histogram.toFixed(2) : "—",
+                  r.macd && r.macd.histogram != null ? (r.macd.histogram > 0 ? "momentum up" : "momentum down") : "")}
+        ${levStat("Volatility", r.volatility == null ? "—" : (r.volatility*100).toFixed(0) + "%",
+                  "annualised, 20d — decay scales with this")}
+        ${levStat("Crossings", String(r.crossings_90d ?? 0), "last 90 days")}
+        ${levStat("50 vs 200", r.golden_cross == null ? "—" : (r.golden_cross ? "golden" : "death"),
+                  r.golden_cross == null ? "" : (r.golden_cross ? "short trend agrees" : "short trend does not"))}
+        ${levStat(esc(r.symbol) + " drawdown", r.drawdown == null ? "—" : pct(r.drawdown, 0),
+                  "from 12-month high")}
+      </div>
+
+      ${(r.notes && r.notes.length) ? `<div class="lnotes">
+        <h3>What would make this wrong</h3>
+        <ul>${r.notes.map(n => `<li>${esc(n)}</li>`).join("")}</ul>
+      </div>` : ""}
+
+      <p class="levfoot">This is what a stated, mechanical rule says about today's
+      closes, with the conditions that make the rule fail shown beside it. It is not
+      advice, there is no order execution in this repo, and the rule is well known
+      to whipsaw near the line.</p>
+    </div>`;
+
+  out.querySelectorAll("button[data-lev]").forEach(b =>
+    b.addEventListener("click", () => { LEV_SYM = b.dataset.lev; renderLev(); }));
 }
 
 async function loadSession(session){

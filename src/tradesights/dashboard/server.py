@@ -164,6 +164,65 @@ def api_quadrants() -> dict:
     }
 
 
+#: The leveraged funds this tab knows how to reason about, and the index each
+#: one actually tracks. The mapping is the whole point: every signal is computed
+#: on the UNDERLYING, because a 3x fund's own moving average moves with decay as
+#: well as with the market. See core/trend.py.
+LEVERAGED = {
+    "TQQQ": "QQQ",
+    "UPRO": "SPY",
+    "SOXL": "SOXX",
+    "QLD": "QQQ",
+}
+
+#: yfinance is scraped and rate-limits. One reading per symbol per 15 minutes is
+#: far more often than a daily rule can change and far less often than a browser
+#: tab left open would ask.
+_TREND_CACHE: dict[str, tuple[float, dict]] = {}
+_TREND_TTL = 900.0
+
+
+@app.get("/api/trend/{symbol}")
+def api_trend(symbol: str) -> dict:
+    """Today's reading of the 200-day rule for one leveraged fund."""
+    import time as _time
+
+    from tradesights.core import trend as trendmod
+    from tradesights.ingest.market import fetch_history
+
+    sym = symbol.upper().strip()
+    under = LEVERAGED.get(sym)
+    if under is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"{sym} is not one of {', '.join(sorted(LEVERAGED))}. "
+                   "Add it to LEVERAGED with the index it tracks.",
+        )
+
+    hit = _TREND_CACHE.get(sym)
+    if hit and (_time.time() - hit[0]) < _TREND_TTL:
+        return hit[1]
+
+    series = fetch_history([sym, under])
+    lev = series.get(sym) or {}
+    idx = series.get(under) or {}
+    reading = trendmod.evaluate(
+        symbol=sym,
+        underlying=under,
+        closes=lev.get("closes") or [],
+        under_closes=idx.get("closes") or [],
+        dates=idx.get("dates") or [],
+    )
+    payload = reading.as_dict()
+    payload["universe"] = sorted(LEVERAGED)
+    # Only cache a reading that actually has data — caching a failed scrape for
+    # fifteen minutes turns a transient rate-limit into a quarter hour of "no
+    # price data came back".
+    if payload.get("sma_slow") is not None:
+        _TREND_CACHE[sym] = (_time.time(), payload)
+    return payload
+
+
 @app.get("/")
 def index() -> FileResponse:
     return FileResponse(STATIC / "index.html")
