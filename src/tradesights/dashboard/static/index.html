@@ -208,6 +208,21 @@ svg .mark{cursor:default}
   text-decoration-color:var(--down);color:var(--muted)}
 .rule.struck b{color:var(--muted)}
 .chip.gap{opacity:.5;cursor:default}
+
+/* The chart's hit targets and hover state. */
+svg .mark .hit { fill: transparent; stroke: none; cursor: pointer; }
+svg .mark .drop { stroke: transparent; stroke-width: 1; stroke-dasharray: 2 3; }
+svg .mark.active .drop { stroke: var(--line); }
+svg .mark.active circle:not(.hit) { r: 5; }
+svg .mark:focus { outline: none; }
+svg .mark:focus .drop { stroke: var(--accent); }
+details.trace > summary { cursor: pointer; list-style: none; display: flex;
+  align-items: baseline; gap: 12px; flex-wrap: wrap; }
+details.trace > summary::-webkit-details-marker { display: none; }
+details.trace > summary h2 { display: inline; }
+details.trace > summary::after { content: "▸"; color: var(--faint); }
+details.trace[open] > summary::after { content: "▾"; }
+.chip.go-why { cursor: pointer; margin-top: 8px; }
 </style>
 </head>
 <body>
@@ -624,7 +639,23 @@ function render(){
  * believed and Pearson's r over a handful of pairs will happily read 0.6 on
  * noise.
  */
-let PAID = null, PAID_H = 5, PAID_SYM = null, PAID_SERIES = null;
+let PAID = null, PAID_H = 5, PAID_SYM = null, PAID_SERIES = null, PAID_SIDE = "both";
+
+
+/* Why a longer horizon shows FEWER trades.
+ *
+ * Asked every time, because the number moves the wrong way against intuition:
+ * 3d has more trades than 10d, which reads like the tool is doing less work the
+ * further out you look. It is the archive, not the tool — an observation cannot
+ * resolve until a snapshot exists far enough after it, so each extra day of
+ * horizon strands another slice of the most recent observations. */
+function countNote(p){
+  const a = p.archive || {};
+  return `${p.resolved} of ${a.observations ?? "?"} observations are old enough to `
+    + `resolve at ${p.horizon_days}d — the archive spans ${a.span_days ?? "?"} days, `
+    + `so a longer horizon always resolves fewer. ${p.traded} carried a position; `
+    + `${p.stood_aside} stood aside (chase and quiet are not trades).`;
+}
 
 async function renderPaid(){
   out.innerHTML = `<p class="empty">Scoring the archive…</p>`;
@@ -632,11 +663,35 @@ async function renderPaid(){
     PAID = await (await fetch(`/api/backtest?horizon=${PAID_H}`)).json();
   }catch(e){ out.innerHTML = `<div class="panel"><p class="empty">could not score: ${esc(e)}</p></div>`; return; }
 
+  const hChips = `<div class="chips" id="paid-h">
+      ${[3,5,10,20].map(h=>`<span class="chip ${h===PAID_H?"on":""}" data-h="${h}">${h}d</span>`).join("")}
+    </div>`;
+
   if(!PAID.traded){
-    out.innerHTML = `<div class="panel"><h2>Nothing has resolved yet</h2>
-      <p class="empty">${PAID.resolved} observation(s) scored, but none carried a
-      position at this horizon. ${PAID.stood_aside} stood aside — chase and quiet
-      are deliberately not trades.</p></div>`;
+    // The horizon chips render HERE too, and that is the whole point of this
+    // branch existing separately. Selecting 20d against a 17-day archive
+    // resolves nothing, and the empty state used to omit the chips — so the one
+    // control that could get you out was missing from the only screen where you
+    // needed it. A dead end reached by using the page normally.
+    const a = PAID.archive || {};
+    out.innerHTML = `<div class="panel">
+      <h2>Nothing can resolve at ${PAID_H} days yet</h2>
+      ${hChips}
+      <p class="sub">This is arithmetic, not a failure. An observation resolves
+      only when a later snapshot exists at least ${PAID_H} days after it, and
+      the archive spans <b>${a.span_days ?? "?"} days</b>
+      (${a.sessions ?? "?"} sessions, ${a.observations ?? "?"} observations).
+      ${a.span_days != null && a.span_days < PAID_H
+        ? `Nothing is ${PAID_H} days old enough yet — pick a shorter horizon, or wait
+           ${PAID_H - a.span_days} more day(s) of snapshots.`
+        : `${PAID.resolved} resolved but none carried a position:
+           ${PAID.stood_aside} stood aside, and chase and quiet are deliberately
+           not trades.`}</p>
+    </div>`;
+    out.querySelector("#paid-h").addEventListener("click", e => {
+      const c = e.target.closest(".chip"); if(!c) return;
+      PAID_H = +c.dataset.h; PAID_SERIES = null; renderPaid();
+    });
     return;
   }
 
@@ -653,9 +708,14 @@ async function renderPaid(){
     to take a side, and counting them as wins would be inventing a claim it does
     not make.</p>
 
-    <div class="chips" id="paid-h">
-      ${[3,5,10,20].map(h=>`<span class="chip ${h===PAID_H?"on":""}" data-h="${h}">${h}d</span>`).join("")}
+    <div class="filters">
+      ${hChips}
+      <div class="chips" id="paid-side">
+        ${[["both","both sides"],["long","long only"],["short","short only"]]
+          .map(([k,l])=>`<span class="chip ${k===PAID_SIDE?"on":""}" data-side="${k}">${l}</span>`).join("")}
+      </div>
     </div>
+    <p class="sub count-note">${countNote(PAID)}</p>
 
     <div class="stat-row">
       ${stat("Trades", PAID.traded, `${PAID.wins}W / ${PAID.losses}L · ${PAID.stood_aside} stood aside`)}
@@ -677,30 +737,19 @@ async function renderPaid(){
 
     <div class="grid2">
       <div>
-        <h3>Does a bigger signal pay more?</h3>
-        ${c.reportable
-          ? `<p class="big ${c.rho>0.2?"up":c.rho<-0.2?"down":""}">&rho; = ${c.rho.toFixed(2)}</p>
-             <p class="sub pair">rank correlation &mdash; ranks both series, so one
-             catastrophic trade is the worst rank rather than a lever.
-             Linear <b>r = ${c.r.toFixed(2)}</b>${Math.abs(c.rho-c.r)>0.05
-               ? `, lower because return SIZE is dominated by outliers while the
-                  ranking is not. When these disagree the rank one is the honest
-                  read.` : `.`}</p>`
-          : `<p class="big muted">not stated</p>`}
-        <p class="sub">${esc(c.note)}</p>
-        <table class="t"><thead><tr><th>divergence</th><th>n</th><th>mean</th><th>hit</th></tr></thead>
-        <tbody>${c.buckets.map(b=>`<tr>
-          <td class="mono">${b.from.toFixed(2)} – ${b.to.toFixed(2)}</td>
-          <td class="mono">${b.n}</td>
-          <td class="mono ${b.mean_return>0?"up":"down"}">${pct(b.mean_return,2)}</td>
-          <td class="mono">${(b.hit_rate*100).toFixed(0)}%</td></tr>`).join("")}</tbody></table>
-      </div>
-      <div>
         <h3>Where the record was made</h3>
         ${curveSvg(PAID.curve)}
         <p class="sub">Cumulative, in the order the signals were given. One good
-        week carrying everything is a different tool from a steady drip, and a
-        single number hides which one you have.</p>
+        week carrying everything is a different tool from a steady drip.</p>
+      </div>
+      <div>
+        <h3>Is the ranking worth anything?</h3>
+        <p class="sub">Whether a bigger signal actually pays more, which factors
+        separated the winners, and whether any filter survives a shuffle test —
+        all of that lives on <b>Why</b>. It is analysis, and this page is a
+        result; mixing them is how a page gets long enough that nobody reads
+        the number at the top of it.</p>
+        <button class="chip go-why">Open Why →</button>
       </div>
     </div>
   </div>
@@ -726,8 +775,12 @@ async function renderPaid(){
   </div>
 
   <div class="panel">
-    <h2>The trace</h2>
-    <p class="sub">Every trade, worst first. This is the record — not a summary of it.</p>
+    <!-- 122 rows was the single biggest thing on this page and the least often
+         read. Kept in full, because a scoreboard you cannot audit is a claim
+         rather than a record — but shut, because the default view should answer
+         the question, not prove it. -->
+    <details class="trace">
+      <summary><h2>The trace</h2><span class="sub">${PAID.traded} trades, worst first — open to audit the number above</span></summary>
     <table class="t"><thead><tr>
       <th>session</th><th>name</th><th>signal</th><th>side</th>
       <th>divergence</th><th>in</th><th>out</th><th>result</th></tr></thead>
@@ -741,11 +794,22 @@ async function renderPaid(){
       <td class="mono">${t.exit_price.toFixed(2)}</td>
       <td class="mono ${t.won?"up":"down"}">${pct(t.pnl_return,2)}</td></tr>`).join("")}
     </tbody></table>
+    </details>
   </div>`;
 
   out.querySelector("#paid-h").addEventListener("click", e => {
     const c = e.target.closest(".chip"); if(!c) return;
     PAID_H = +c.dataset.h; PAID_SERIES = null; renderPaid();
+  });
+  const why = out.querySelector(".go-why");
+  if(why) why.addEventListener("click", () => {
+    TAB = "why";
+    $("#tabs").querySelectorAll("button").forEach(x=>x.classList.toggle("on", x.dataset.tab==="why"));
+    render();
+  });
+  out.querySelector("#paid-side").addEventListener("click", e => {
+    const c = e.target.closest(".chip"); if(!c) return;
+    PAID_SIDE = c.dataset.side; renderPaid();
   });
   out.querySelector("#paid-syms").addEventListener("click", e => {
     const c = e.target.closest(".chip"); if(!c) return;
@@ -786,6 +850,53 @@ async function loadPaidChart(){
     PAID_SERIES = await (await fetch(`/api/backtest/${encodeURIComponent(PAID_SYM)}?horizon=${PAID_H}`)).json();
   }catch(e){ host.innerHTML = `<p class="empty">could not load ${esc(PAID_SYM)}</p>`; return; }
   host.innerHTML = priceSvg(PAID_SERIES);
+  wireChart(host, PAID_SERIES);
+}
+
+/* Hover, focus and keyboard on the price chart.
+ *
+ * The marks are the content of this view — each one is "the tool said something
+ * here" — so they have to be inspectable without leaving the picture. A native
+ * <title> could not show entry and exit together, and appears a second late.
+ *
+ * A separate invisible `.hit` circle does the catching: a 3.4px dot is a
+ * pixel-hunt on a laptop trackpad, and enlarging the visible dot to fix that
+ * would make a dense week of signals read as one blob. tabindex makes the same
+ * detail reachable without a mouse. */
+function wireChart(host, d){
+  const svg = host.querySelector("svg.price");
+  if(!svg) return;
+  const marks = d.marks || [];
+
+  const show = (g) => {
+    const m = marks[+g.dataset.mark];
+    if(!m) return;
+    svg.querySelectorAll(".mark").forEach(x=>x.classList.toggle("active", x===g));
+    const r = g.querySelector("circle").getBoundingClientRect();
+    tip.innerHTML = `<b>${esc(d.symbol)}</b> · ${esc(m.session)}<br>
+      ${esc(m.quadrant.replace(/_/g," "))} · <b>${m.direction>0?"long":"short"}</b><br>
+      in ${m.price.toFixed(2)} → out ${m.exit_price.toFixed(2)}
+      <b class="${m.won?"up":"down"}">${pct(m.pnl_return,2)}</b><br>
+      <span class="faint">divergence ${m.divergence.toFixed(2)} · ${d.horizon_days}d</span>`;
+    tip.classList.add("on");
+    // Clamped to the viewport: a mark near the right edge would otherwise push
+    // the card off screen, which is the same as having no card.
+    const w = tip.offsetWidth || 220;
+    tip.style.left = Math.min(r.left + window.scrollX + 14, innerWidth - w - 12) + "px";
+    tip.style.top  = (r.top + window.scrollY - 8) + "px";
+  };
+  const hide = () => {
+    tip.classList.remove("on");
+    svg.querySelectorAll(".mark.active").forEach(x=>x.classList.remove("active"));
+  };
+
+  svg.querySelectorAll(".mark").forEach(g => {
+    g.addEventListener("mouseenter", () => show(g));
+    g.addEventListener("focus", () => show(g));
+    g.addEventListener("mouseleave", hide);
+    g.addEventListener("blur", hide);
+  });
+  svg.addEventListener("mouseleave", hide);
 }
 
 /* Price with the alerts on it.
@@ -804,20 +915,27 @@ function priceSvg(d){
   const idx = Object.fromEntries(s.map((p,i)=>[p.session,i]));
   const line = s.map((p,i)=>`${i?"L":"M"}${x(i).toFixed(1)},${y(p.price).toFixed(1)}`).join("");
 
-  const marks = (d.marks||[]).map(m=>{
+  // Marks carry their data on the element. A <title> child gives you the
+  // browser's native tooltip: a second of delay, no styling, and it cannot show
+  // the entry and exit together — which is the one thing you want when asking
+  // "what would acting here have done".
+  const marks = (d.marks||[]).map((m,k)=>{
     const i = idx[m.session];
     if(i===undefined) return "";
     const cx = x(i), cy = y(m.price);
     const cls = m.won ? "won" : "lost";
     // Direction is a triangle, outcome is fill. Two channels, so a colourblind
     // reader still gets the side even if the fill is ambiguous.
-    const tip = `${m.session} · ${m.quadrant.replace(/_/g," ")} · ${m.direction>0?"long":"short"} · ${pct(m.pnl_return,2)}`;
     const arrow = m.direction>0
       ? `M${cx},${cy-9} l5,9 l-10,0 z`
       : `M${cx},${cy+9} l5,-9 l-10,0 z`;
-    return `<g class="mark ${cls}"><title>${esc(tip)}</title>
+    return `<g class="mark ${cls}" data-mark="${k}" tabindex="0"
+               role="button" aria-label="${esc(m.session)} ${m.direction>0?"long":"short"}, ${pct(m.pnl_return,2)}">
       <path d="${arrow}"/>
-      <circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="3.4"/></g>`;
+      <circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="3.4"/>
+      <circle class="hit" cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="14"/>
+      <line class="drop" x1="${cx.toFixed(1)}" y1="${cy.toFixed(1)}" x2="${cx.toFixed(1)}" y2="${(H-B).toFixed(1)}"/>
+    </g>`;
   }).join("");
 
   return `<svg viewBox="0 0 ${W} ${H}" class="price">

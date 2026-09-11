@@ -15,6 +15,7 @@ as an empty archive with the command to fix it, rather than as a broken page.
 
 from __future__ import annotations
 
+import datetime as dt
 import logging
 from pathlib import Path
 
@@ -135,6 +136,23 @@ def api_backtest(horizon: int = Query(5, ge=1, le=60)) -> dict:
     board = backtest.run(outcomes, horizon_days=horizon)
     corr = backtest.correlate_divergence(board)
 
+    # Why a longer horizon has FEWER trades, answered on the page instead of
+    # left as a mystery.
+    #
+    # An observation resolves only if a later snapshot exists at least `horizon`
+    # days after it. The archive spans a fixed number of days, so every day you
+    # push the horizon out, another slice of the most recent observations has no
+    # answer yet. At 20 days against a 17-day archive, nothing can resolve —
+    # which rendered as an empty page that looked like a bug rather than like
+    # arithmetic.
+    sessions = store.sessions(limit=1000)
+    span_days = 0
+    if len(sessions) >= 2:
+        first = dt.date.fromisoformat(sessions[-1]["session"])
+        last = dt.date.fromisoformat(sessions[0]["session"])
+        span_days = (last - first).days
+    observations = sum(int(x.get("n") or 0) for x in sessions)
+
     per_symbol: dict[str, dict] = {}
     for t in board.trades:
         d = per_symbol.setdefault(t.symbol, {"symbol": t.symbol, "n": 0, "wins": 0, "total": 0.0})
@@ -145,6 +163,13 @@ def api_backtest(horizon: int = Query(5, ge=1, le=60)) -> dict:
 
     return {
         "horizon_days": horizon,
+        # The shape of the archive, so the page can explain its own numbers.
+        "archive": {
+            "sessions": len(sessions),
+            "span_days": span_days,
+            "observations": observations,
+            "resolvable": span_days >= horizon,
+        },
         "resolved": len(outcomes),
         "traded": board.n,
         "stood_aside": board.stood_aside,
