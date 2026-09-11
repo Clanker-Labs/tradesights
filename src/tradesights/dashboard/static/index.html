@@ -149,6 +149,65 @@ footer{color:var(--faint);font-size:12px;border-top:1px solid var(--line);
 .lnotes ul{margin:0;padding-left:18px}
 .lnotes li{color:#A8B3BF;font-size:13px;line-height:1.6;margin-bottom:6px}
 .levfoot{margin-top:20px;color:#5A6673;font-size:11.5px;line-height:1.6;max-width:80ch}
+
+/* ---- would it have paid ------------------------------------------------ */
+.stat-row{display:flex;gap:10px;flex-wrap:wrap;margin:14px 0}
+.stat{flex:1 1 140px;background:var(--sunken);border:1px solid var(--line);
+  border-radius:10px;padding:10px 12px}
+.stat-l{font:10px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--faint)}
+.stat-v{font:600 22px/1.2 var(--mono);color:var(--heading);margin-top:6px}
+.stat-n{font:10.5px/1.4 var(--mono);color:var(--faint);margin-top:4px}
+
+/* The baseline sentence. Given a box of its own because it is the line that
+ * decides whether the hit rate above it means anything, and a reader who skims
+ * headline numbers and skips prose would otherwise skip exactly the wrong one. */
+.verdict{border:1px solid var(--line);border-left-width:3px;border-radius:8px;
+  padding:11px 14px;margin:14px 0;font-size:13.5px;line-height:1.6;color:var(--body);
+  background:var(--sunken)}
+.verdict.up{border-left-color:var(--up)} .verdict.down{border-left-color:var(--down)}
+.verdict b{color:var(--heading)}
+
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:22px;margin-top:18px}
+@media(max-width:900px){.grid2{grid-template-columns:1fr}}
+.big{font:600 30px/1.1 var(--mono);color:var(--heading);margin:6px 0 2px}
+.big.up{color:var(--up)} .big.down{color:var(--down)} .big.muted{color:var(--faint)}\n.sub.pair{font-size:12px;line-height:1.55;color:var(--faint);margin:0 0 8px}\n.sub.pair b{color:var(--body)}
+
+svg.curve,svg.price{width:100%;height:auto;display:block;margin:8px 0}
+svg.curve .line{fill:none;stroke:var(--accent);stroke-width:1.6}
+/* The price line is CONTEXT and the marks are the content, so the line is drawn
+ * in the body grey rather than the brand accent. Accent line + green won-marks
+ * were two similar greens, which made the thing you are meant to read blend
+ * into the thing it is drawn on. */
+svg.price .line{fill:none;stroke:var(--faint);stroke-width:1.4}
+svg.curve .line.down{stroke:var(--down)}
+svg .axis{stroke:var(--line);stroke-width:1}
+svg .tick{font:10px var(--mono);fill:var(--faint)}
+svg .tick.end{text-anchor:end}
+
+/* Outcome is fill, direction is the triangle. Two channels rather than colour
+ * alone, so the side of the trade survives a colourblind reader. */
+svg .mark circle{stroke-width:1.6}
+svg .mark.won circle{fill:var(--up);stroke:var(--up)}
+svg .mark.lost circle{fill:none;stroke:var(--down)}
+svg .mark.won path{fill:var(--up);opacity:.85}
+svg .mark.lost path{fill:var(--down);opacity:.55}
+svg .mark{cursor:default}
+
+/* ---- why ---------------------------------------------------------------- */
+.spark{display:inline-flex;gap:3px;align-items:flex-end;height:26px}
+.spark .q{width:9px;background:var(--accent);opacity:.65;border-radius:2px 2px 0 0;
+  height:var(--h);min-height:2px;display:block}
+.muted-row td{color:var(--faint)}
+.rulecard{border:1px solid var(--line);border-radius:10px;padding:14px;margin:12px 0}
+.rulecard.dead{opacity:.92}
+.rule{font:600 19px/1.3 var(--mono);color:var(--heading);margin-bottom:10px}
+.rule b{color:var(--accent)}
+/* A rule the shuffle test killed is drawn struck through, so it cannot be
+ * screenshotted out of context as a recommendation. */
+.rule.struck{text-decoration:line-through;text-decoration-thickness:2px;
+  text-decoration-color:var(--down);color:var(--muted)}
+.rule.struck b{color:var(--muted)}
+.chip.gap{opacity:.5;cursor:default}
 </style>
 </head>
 <body>
@@ -170,6 +229,8 @@ footer{color:var(--faint);font-size:12px;border-top:1px solid var(--line);
   <button data-tab="list">Ranked</button>
   <button data-tab="resolve">Did it go anywhere</button>
   <button data-tab="archive">Archive</button>
+  <button data-tab="paid">Would it have paid?</button>
+  <button data-tab="why">Why</button>
   <button data-tab="lev">Leveraged</button>
 </nav>
 
@@ -527,6 +588,8 @@ async function renderArchive(){
 
 /* ---------- shell ------------------------------------------------------ */
 function render(){
+  if(TAB === "paid") return renderPaid();
+  if(TAB === "why") return renderWhy();
   if(TAB === "lev") return renderLev();
   if(TAB === "resolve") return renderResolve();
   if(TAB === "archive") return renderArchive();
@@ -540,6 +603,347 @@ function render(){
     return;
   }
   (TAB === "map" ? renderMap : renderList)();
+}
+
+
+/* ---------- would it have paid? ---------------------------------------- *
+ *
+ * The archive can say "the price moved after we flagged this". It could not
+ * say "we would have made money", and the difference is a direction: +3% is a
+ * win if the signal said buy and a loss if it said sell.
+ *
+ * Two rules this view will not break.
+ *
+ * The BASELINE travels with the headline, always. Buying the same names on the
+ * same days with no signal at all is the comparison that stops a rising market
+ * being read as skill, and a hit rate printed without it is the single most
+ * misleading number this tool could show.
+ *
+ * The CORRELATION refuses rather than rounds. Below the floor in
+ * core/backtest.py there is no coefficient, because a number on screen gets
+ * believed and Pearson's r over a handful of pairs will happily read 0.6 on
+ * noise.
+ */
+let PAID = null, PAID_H = 5, PAID_SYM = null, PAID_SERIES = null;
+
+async function renderPaid(){
+  out.innerHTML = `<p class="empty">Scoring the archive…</p>`;
+  try{
+    PAID = await (await fetch(`/api/backtest?horizon=${PAID_H}`)).json();
+  }catch(e){ out.innerHTML = `<div class="panel"><p class="empty">could not score: ${esc(e)}</p></div>`; return; }
+
+  if(!PAID.traded){
+    out.innerHTML = `<div class="panel"><h2>Nothing has resolved yet</h2>
+      <p class="empty">${PAID.resolved} observation(s) scored, but none carried a
+      position at this horizon. ${PAID.stood_aside} stood aside — chase and quiet
+      are deliberately not trades.</p></div>`;
+    return;
+  }
+
+  if(!PAID_SYM && PAID.by_symbol.length) PAID_SYM = PAID.by_symbol[0].symbol;
+
+  const c = PAID.correlation;
+  const edgeCls = PAID.edge > 0 ? "up" : PAID.edge < 0 ? "down" : "";
+
+  out.innerHTML = `
+  <div class="panel">
+    <h2>Would it have paid?</h2>
+    <p class="sub">Every signal old enough to have an answer, acted on at the
+    horizon below. Chase and quiet are not trades — they are the tool declining
+    to take a side, and counting them as wins would be inventing a claim it does
+    not make.</p>
+
+    <div class="chips" id="paid-h">
+      ${[3,5,10,20].map(h=>`<span class="chip ${h===PAID_H?"on":""}" data-h="${h}">${h}d</span>`).join("")}
+    </div>
+
+    <div class="stat-row">
+      ${stat("Trades", PAID.traded, `${PAID.wins}W / ${PAID.losses}L · ${PAID.stood_aside} stood aside`)}
+      ${stat("Hit rate", (PAID.hit_rate*100).toFixed(0)+"%", "")}
+      ${stat("Mean per trade", pct(PAID.mean_return,2), "")}
+      ${stat("Total", pct(PAID.total_return,1), "one unit per signal, not compounded")}
+    </div>
+
+    <div class="verdict ${edgeCls}">
+      <b>${pct(PAID.edge,2)} edge.</b>
+      Acting on the signals returned ${pct(PAID.mean_return,2)} per trade.
+      Buying the very same names on the very same days and ignoring the signal
+      returned ${pct(PAID.baseline_return,2)}.
+      ${Math.abs(PAID.edge) < 0.002
+        ? "That is the same number. Over this sample the signal moved nothing."
+        : PAID.edge > 0 ? "The signal was worth something over this sample."
+                        : "The signal cost you, relative to just holding them."}
+    </div>
+
+    <div class="grid2">
+      <div>
+        <h3>Does a bigger signal pay more?</h3>
+        ${c.reportable
+          ? `<p class="big ${c.rho>0.2?"up":c.rho<-0.2?"down":""}">&rho; = ${c.rho.toFixed(2)}</p>
+             <p class="sub pair">rank correlation &mdash; ranks both series, so one
+             catastrophic trade is the worst rank rather than a lever.
+             Linear <b>r = ${c.r.toFixed(2)}</b>${Math.abs(c.rho-c.r)>0.05
+               ? `, lower because return SIZE is dominated by outliers while the
+                  ranking is not. When these disagree the rank one is the honest
+                  read.` : `.`}</p>`
+          : `<p class="big muted">not stated</p>`}
+        <p class="sub">${esc(c.note)}</p>
+        <table class="t"><thead><tr><th>divergence</th><th>n</th><th>mean</th><th>hit</th></tr></thead>
+        <tbody>${c.buckets.map(b=>`<tr>
+          <td class="mono">${b.from.toFixed(2)} – ${b.to.toFixed(2)}</td>
+          <td class="mono">${b.n}</td>
+          <td class="mono ${b.mean_return>0?"up":"down"}">${pct(b.mean_return,2)}</td>
+          <td class="mono">${(b.hit_rate*100).toFixed(0)}%</td></tr>`).join("")}</tbody></table>
+      </div>
+      <div>
+        <h3>Where the record was made</h3>
+        ${curveSvg(PAID.curve)}
+        <p class="sub">Cumulative, in the order the signals were given. One good
+        week carrying everything is a different tool from a steady drip, and a
+        single number hides which one you have.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>On the chart</h2>
+    <p class="sub">Every alert on one name, marked on the price it fired at.
+    Filled = the trade won, hollow = it lost.</p>
+    <div class="chips" id="paid-syms">
+      ${(() => {
+        // Both ends, not the top. Sorting by total and slicing to 14 listed
+        // winners only — on a tab about finding losers, the losers were the
+        // one thing you could not click.
+        const a = PAID.by_symbol, n = a.length;
+        const picked = n <= 16 ? a : [...a.slice(0,8), null, ...a.slice(-8)];
+        return picked.map(d => d === null
+          ? `<span class="chip gap">…${n-16} more…</span>`
+          : `<span class="chip ${d.symbol===PAID_SYM?"on":""}" data-sym="${esc(d.symbol)}">
+             ${esc(d.symbol)} <b class="${d.total>0?"up":"down"}">${pct(d.total,1)}</b></span>`).join("");
+      })()}
+    </div>
+    <div id="paid-chart"><p class="empty">Loading ${esc(PAID_SYM||"")}…</p></div>
+  </div>
+
+  <div class="panel">
+    <h2>The trace</h2>
+    <p class="sub">Every trade, worst first. This is the record — not a summary of it.</p>
+    <table class="t"><thead><tr>
+      <th>session</th><th>name</th><th>signal</th><th>side</th>
+      <th>divergence</th><th>in</th><th>out</th><th>result</th></tr></thead>
+    <tbody>${[...PAID.trades].sort((a,b)=>a.pnl_return-b.pnl_return).map(t=>`<tr>
+      <td class="mono">${esc(t.session)}</td>
+      <td class="mono"><b>${esc(t.symbol)}</b></td>
+      <td>${esc(t.quadrant.replace(/_/g," "))}</td>
+      <td class="mono">${t.direction>0?"long":"short"}</td>
+      <td class="mono">${t.divergence.toFixed(2)}</td>
+      <td class="mono">${t.entry_price.toFixed(2)}</td>
+      <td class="mono">${t.exit_price.toFixed(2)}</td>
+      <td class="mono ${t.won?"up":"down"}">${pct(t.pnl_return,2)}</td></tr>`).join("")}
+    </tbody></table>
+  </div>`;
+
+  out.querySelector("#paid-h").addEventListener("click", e => {
+    const c = e.target.closest(".chip"); if(!c) return;
+    PAID_H = +c.dataset.h; PAID_SERIES = null; renderPaid();
+  });
+  out.querySelector("#paid-syms").addEventListener("click", e => {
+    const c = e.target.closest(".chip"); if(!c) return;
+    PAID_SYM = c.dataset.sym; loadPaidChart();
+  });
+  loadPaidChart();
+}
+
+function stat(label, value, note){
+  return `<div class="stat"><div class="stat-l">${esc(label)}</div>
+    <div class="stat-v">${esc(value)}</div>
+    ${note?`<div class="stat-n">${esc(note)}</div>`:""}</div>`;
+}
+
+/* The equity curve. Additive, so the shape is the strategy rather than the
+ * order the archive happened to store things in. */
+function curveSvg(curve){
+  if(!curve.length) return `<p class="empty">nothing yet</p>`;
+  const W=420,H=120,P=8;
+  const ys = curve.map(p=>p.cumulative);
+  const lo = Math.min(0,...ys), hi = Math.max(0,...ys), span = (hi-lo)||1;
+  const x = i => P + i*(W-2*P)/Math.max(1,curve.length-1);
+  const y = v => H-P - (v-lo)*(H-2*P)/span;
+  const d = curve.map((p,i)=>`${i?"L":"M"}${x(i).toFixed(1)},${y(p.cumulative).toFixed(1)}`).join("");
+  const zero = y(0);
+  return `<svg viewBox="0 0 ${W} ${H}" class="curve">
+    <line x1="${P}" x2="${W-P}" y1="${zero}" y2="${zero}" class="axis"/>
+    <path d="${d}" class="line ${ys[ys.length-1]>=0?"up":"down"}"/>
+  </svg>`;
+}
+
+async function loadPaidChart(){
+  const host = document.getElementById("paid-chart");
+  if(!host || !PAID_SYM) return;
+  document.querySelectorAll("#paid-syms .chip").forEach(c =>
+    c.classList.toggle("on", c.dataset.sym === PAID_SYM));
+  try{
+    PAID_SERIES = await (await fetch(`/api/backtest/${encodeURIComponent(PAID_SYM)}?horizon=${PAID_H}`)).json();
+  }catch(e){ host.innerHTML = `<p class="empty">could not load ${esc(PAID_SYM)}</p>`; return; }
+  host.innerHTML = priceSvg(PAID_SERIES);
+}
+
+/* Price with the alerts on it.
+ *
+ * The mark's y comes from the archived entry price, not from looking the date
+ * up in the series — same rows, so a mark cannot drift off the line it is
+ * supposed to be sitting on. */
+function priceSvg(d){
+  const s = d.series;
+  if(!s.length) return `<p class="empty">no stored prices for ${esc(d.symbol)}</p>`;
+  const W=900,H=300,L=44,R=12,T=14,B=26;
+  const ps = s.map(p=>p.price);
+  const lo = Math.min(...ps), hi = Math.max(...ps), span = (hi-lo)||1;
+  const x = i => L + i*(W-L-R)/Math.max(1,s.length-1);
+  const y = v => H-B - (v-lo)*(H-T-B)/span;
+  const idx = Object.fromEntries(s.map((p,i)=>[p.session,i]));
+  const line = s.map((p,i)=>`${i?"L":"M"}${x(i).toFixed(1)},${y(p.price).toFixed(1)}`).join("");
+
+  const marks = (d.marks||[]).map(m=>{
+    const i = idx[m.session];
+    if(i===undefined) return "";
+    const cx = x(i), cy = y(m.price);
+    const cls = m.won ? "won" : "lost";
+    // Direction is a triangle, outcome is fill. Two channels, so a colourblind
+    // reader still gets the side even if the fill is ambiguous.
+    const tip = `${m.session} · ${m.quadrant.replace(/_/g," ")} · ${m.direction>0?"long":"short"} · ${pct(m.pnl_return,2)}`;
+    const arrow = m.direction>0
+      ? `M${cx},${cy-9} l5,9 l-10,0 z`
+      : `M${cx},${cy+9} l5,-9 l-10,0 z`;
+    return `<g class="mark ${cls}"><title>${esc(tip)}</title>
+      <path d="${arrow}"/>
+      <circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="3.4"/></g>`;
+  }).join("");
+
+  return `<svg viewBox="0 0 ${W} ${H}" class="price">
+    <text x="4" y="${y(hi)+4}" class="tick">${hi.toFixed(0)}</text>
+    <text x="4" y="${y(lo)+4}" class="tick">${lo.toFixed(0)}</text>
+    <line x1="${L}" x2="${W-R}" y1="${y(lo)}" y2="${y(lo)}" class="axis"/>
+    <path d="${line}" class="line"/>
+    ${marks}
+    <text x="${L}" y="${H-6}" class="tick">${esc(s[0].session)}</text>
+    <text x="${W-R}" y="${H-6}" class="tick end">${esc(s[s.length-1].session)}</text>
+  </svg>`;
+}
+
+
+/* ---------- why: what separated them, and whether to believe it -------- *
+ *
+ * This tab exists to answer "root out the losers", and it is the one place in
+ * this tool that can lie convincingly. A search over 122 trades and six factors
+ * WILL produce a rule that looks like a strategy; the only question is whether
+ * it would have produced one from noise too.
+ *
+ * So the rule and its p-value are rendered as ONE unit and cannot be separated
+ * by scrolling, skimming or screenshotting. If the shuffle test says the search
+ * manufactures rules this good from nothing, the rule is drawn struck through.
+ * A number that survives being read alone is a number that will be acted on
+ * alone.
+ */
+let WHY = null, WHY_H = 5;
+
+async function renderWhy(){
+  out.innerHTML = `<p class="empty">Scoring factors and running the shuffle test…</p>`;
+  try{
+    WHY = await (await fetch(`/api/analytics?horizon=${WHY_H}`)).json();
+  }catch(e){ out.innerHTML = `<div class="panel"><p class="empty">could not score: ${esc(e)}</p></div>`; return; }
+
+  const r = WHY.risk, f = WHY.filters;
+  if(!r.n){ out.innerHTML = `<div class="panel"><p class="empty">nothing resolved at this horizon.</p></div>`; return; }
+
+  const dead = f.p_value !== null && f.p_value > 0.05;
+
+  out.innerHTML = `
+  <div class="panel">
+    <h2>The shape of the record</h2>
+    <p class="sub">What a mean per trade hides. Two strategies with the same
+    average are different things to hold if one wins small and often and the
+    other wins big and rarely.</p>
+    <div class="chips" id="why-h">
+      ${[3,5,10,20].map(h=>`<span class="chip ${h===WHY_H?"on":""}" data-h="${h}">${h}d</span>`).join("")}
+    </div>
+    <div class="stat-row">
+      ${stat("Profit factor", r.profit_factor.toFixed(2), "gross wins ÷ gross losses")}
+      ${stat("Payoff", r.payoff_ratio.toFixed(2), `win ${pct(r.avg_win,2)} · lose ${pct(r.avg_loss,2)}`)}
+      ${stat("Return / unit risk", r.return_per_unit_risk.toFixed(3), "not annualised — 16 days of data")}
+      ${stat("Max drawdown", pct(r.max_drawdown,1), `worst losing streak ${r.max_losing_streak}`)}
+      ${stat("Top trade", (r.top_trade_share*100).toFixed(0)+"%", "share of all profit")}
+    </div>
+    ${r.top_trade_share > 0.35 ? `<div class="verdict down">
+      <b>One name is carrying this.</b> The single best trade is
+      ${(r.top_trade_share*100).toFixed(0)}% of all profit — that is a lucky name
+      wearing a strategy's clothes, not an edge.</div>` : ``}
+  </div>
+
+  <div class="panel">
+    <h2>What separated the winners</h2>
+    <p class="sub">Every observable at signal time, scored against what
+    happened. <b>IC</b> is rank correlation with the result; <b>separation</b>
+    is how far apart the winners and losers sat, in standard deviations.</p>
+    <table class="t"><thead><tr>
+      <th>factor</th><th>n</th><th>IC</th><th>separation</th>
+      <th>winners</th><th>losers</th><th>quartile hit rates</th></tr></thead>
+    <tbody>${WHY.factors.map(x=>{
+      if(x.ic===null) return `<tr class="muted-row"><td class="mono">${esc(x.name)}</td>
+        <td class="mono">${x.n}</td><td colspan="5" class="sub">${esc(x.note)}</td></tr>`;
+      const spark = x.quartiles.map(q=>`<i class="q" style="--h:${Math.round(q.hit_rate*100)}%"
+        title="${q.from} – ${q.to} · n=${q.n} · ${(q.hit_rate*100).toFixed(0)}% hit · ${pct(q.mean_return,2)}"></i>`).join("");
+      return `<tr>
+        <td class="mono"><b>${esc(x.name)}</b></td>
+        <td class="mono">${x.n}</td>
+        <td class="mono ${Math.abs(x.ic)>0.2?(x.ic>0?"up":"down"):""}">${x.ic>=0?"+":""}${x.ic.toFixed(3)}</td>
+        <td class="mono ${Math.abs(x.separation)>0.3?(x.separation>0?"up":"down"):""}">${x.separation>=0?"+":""}${x.separation.toFixed(3)}</td>
+        <td class="mono">${x.winner_mean.toFixed(2)}</td>
+        <td class="mono">${x.loser_mean.toFixed(2)}</td>
+        <td><span class="spark">${spark}</span></td></tr>`;
+    }).join("")}</tbody></table>
+  </div>
+
+  <div class="panel">
+    <h2>The best filter — and whether it is real</h2>
+    <p class="sub">Every decile of every factor, both directions:
+    <b>${f.tried}</b> thresholds tried against <b>${f.baseline_n}</b> trades.
+    A search that size finds something whether or not there is anything there,
+    so the rule is shown with the test that tries to kill it.</p>
+
+    ${f.best ? `
+    <div class="rulecard ${dead?"dead":"alive"}">
+      <div class="rule ${dead?"struck":""}">
+        take only <b>${esc(f.best.factor)} ${esc(f.best.op)} ${f.best.threshold}</b>
+      </div>
+      <div class="stat-row">
+        ${stat("Trades kept", f.best.n, `of ${f.baseline_n}`)}
+        ${stat("Hit rate", (f.best.hit_rate*100).toFixed(0)+"%", "")}
+        ${stat("Mean", pct(f.best.mean_return,2), `baseline ${pct(f.baseline_mean,2)}`)}
+        ${stat("Lift", pct(f.best.lift,2), "over taking everything")}
+      </div>
+      <div class="verdict ${dead?"down":"up"}">
+        <b>p = ${f.p_value===null?"—":f.p_value.toFixed(3)}.</b> ${esc(f.verdict)}
+      </div>
+    </div>` : `<p class="empty">${esc(f.verdict)}</p>`}
+
+    <h3>Runners-up</h3>
+    <p class="sub">Shown so the search is visible rather than implied. Every one
+    of these was also "the best rule" under some small change to the data.</p>
+    <table class="t"><thead><tr><th>rule</th><th>kept</th><th>hit</th><th>mean</th><th>lift</th></tr></thead>
+    <tbody>${f.rules.map(x=>`<tr class="${dead?"muted-row":""}">
+      <td class="mono">${esc(x.factor)} ${esc(x.op)} ${x.threshold}</td>
+      <td class="mono">${x.n}</td>
+      <td class="mono">${(x.hit_rate*100).toFixed(0)}%</td>
+      <td class="mono">${pct(x.mean_return,2)}</td>
+      <td class="mono ${x.lift>0?"up":"down"}">${pct(x.lift,2)}</td></tr>`).join("")}
+    </tbody></table>
+  </div>`;
+
+  out.querySelector("#why-h").addEventListener("click", e => {
+    const c = e.target.closest(".chip"); if(!c) return;
+    WHY_H = +c.dataset.h; renderWhy();
+  });
 }
 
 /* ---------- leveraged: the 200-day rule -------------------------------- *

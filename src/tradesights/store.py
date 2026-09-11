@@ -35,7 +35,7 @@ import logging
 import os
 import sqlite3
 from collections.abc import Iterable, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -232,6 +232,14 @@ class Outcome:
     entry_price: float
     later_price: float
     forward_return: float
+    #: Everything else that was observable at signal time, keyed by name.
+    #:
+    #: Optional and defaulted so nothing that already builds an Outcome has to
+    #: change. It exists so the question "what separated the winners from the
+    #: losers" can be asked of more than the one number that happened to be in
+    #: the ranking — divergence is a summary, and a summary cannot tell you
+    #: which of its inputs was carrying it.
+    factors: dict = field(default_factory=dict)
 
 
 def resolve(horizon_days: int = 5, conn: sqlite3.Connection | None = None,
@@ -253,7 +261,9 @@ def resolve(horizon_days: int = 5, conn: sqlite3.Connection | None = None,
     conn = conn or connect()
     try:
         rows = conn.execute(
-            "SELECT o.symbol, s.session, o.quadrant, o.divergence, o.price "
+            "SELECT o.symbol, s.session, o.quadrant, o.divergence, o.price, "
+            "       o.price_z, o.money_z, o.talk_z, o.rel_1m, "
+            "       o.positioning_conflict, s.regime "
             "FROM observation o JOIN snapshot s ON s.id = o.snapshot_id "
             "WHERE o.price > 0 ORDER BY o.symbol, s.session").fetchall()
 
@@ -280,7 +290,16 @@ def resolve(horizon_days: int = 5, conn: sqlite3.Connection | None = None,
                     symbol=symbol, session=row["session"], quadrant=row["quadrant"],
                     divergence=row["divergence"], horizon_days=horizon_days,
                     entry_price=entry, later_price=exit_,
-                    forward_return=exit_ / entry - 1.0))
+                    forward_return=exit_ / entry - 1.0,
+                    factors={
+                        "divergence": row["divergence"],
+                        "price_z": row["price_z"],
+                        "money_z": row["money_z"],
+                        "talk_z": row["talk_z"],
+                        "rel_1m": row["rel_1m"],
+                        "positioning_conflict": row["positioning_conflict"],
+                        "regime": row["regime"],
+                    }))
         return out
     finally:
         if owned:
