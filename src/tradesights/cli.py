@@ -265,6 +265,82 @@ def resolve(
 
 
 @app.command()
+def backtest(
+    horizon: int = typer.Option(5, "--horizon", help="Calendar days ahead."),
+    shuffles: int = typer.Option(200, "--shuffles",
+                                 help="Permutations for the filter test."),
+    verbose: bool = typer.Option(False, "--verbose", "-v"),
+) -> None:
+    """What acting on the signals would have meant, and why — with the search
+    that finds a filter tested against the same search over shuffled outcomes."""
+    from tradesights import store
+    from tradesights.core import analytics
+    from tradesights.core import backtest as bt
+
+    _setup_logging(verbose)
+    board = bt.run(store.resolve(horizon), horizon_days=horizon)
+    if not board.n:
+        console.print("[yellow]Nothing has resolved into a position at this "
+                      "horizon.[/] Chase and quiet are deliberately not trades.")
+        raise typer.Exit(1)
+
+    # The headline never ships without its baseline. In a rising market every
+    # strategy looks predictive, and the mean alone is how that gets believed.
+    console.print(f"\n[bold]{board.n}[/] trades over {horizon} days  "
+                  f"[dim]({board.wins}W/{board.losses}L, "
+                  f"{board.stood_aside} stood aside)[/]")
+    console.print(f"  hit rate      {board.hit_rate:.0%}")
+    console.print(f"  mean/trade    {board.mean_return:+.2%}")
+    console.print(f"  baseline      {board.baseline_return:+.2%}  "
+                  f"[dim]same names, same days, signal ignored[/]")
+    style = "green" if board.edge > 0 else "red"
+    console.print(f"  edge          [{style}]{board.edge:+.2%}[/]")
+
+    risk = analytics.risk_metrics(board)
+    console.print(f"\n[bold]Shape[/]")
+    console.print(f"  profit factor {risk.profit_factor:.2f}   "
+                  f"payoff {risk.payoff_ratio:.2f}   "
+                  f"ret/risk {risk.return_per_unit_risk:.3f}")
+    console.print(f"  max drawdown  {risk.max_drawdown:.1%}   "
+                  f"worst streak {risk.max_losing_streak}   "
+                  f"top trade {risk.top_trade_share:.0%} of profit")
+
+    table = Table(title="What separated the winners", title_justify="left")
+    table.add_column("factor")
+    for column in ("n", "IC", "separation", "winners", "losers"):
+        table.add_column(column, justify="right")
+    for f in analytics.factor_reports(board):
+        if f.ic is None:
+            table.add_row(f.name, str(f.n), "—", "—", "—", "—")
+            continue
+        table.add_row(f.name, str(f.n), f"{f.ic:+.3f}", f"{f.separation:+.3f}",
+                      f"{f.winner_mean:+.2f}", f"{f.loser_mean:+.2f}")
+    console.print()
+    console.print(table)
+
+    study = analytics.filter_study(board, shuffles=shuffles)
+    console.print()
+    if study.best is None:
+        console.print(f"[yellow]{study.verdict}[/]")
+        return
+    dead = study.p_value is not None and study.p_value > 0.05
+    rule = (f"{study.best.factor} {study.best.op} {study.best.threshold}")
+    console.print(f"[bold]Best of {study.tried} thresholds tried:[/] "
+                  f"{'[strike]' if dead else '[green]'}{rule}"
+                  f"{'[/strike]' if dead else '[/]'}")
+    console.print(f"  keeps {study.best.n} trades, hit {study.best.hit_rate:.0%}, "
+                  f"mean {study.best.mean_return:+.2%} "
+                  f"(lift {study.best.lift:+.2%})")
+    console.print(f"  p = {study.p_value:.3f}")
+    console.print()
+    console.print(f"[{'red' if dead else 'green'}]{study.verdict}[/]")
+    console.print()
+    console.print("[dim]A forward return after a signal is not a trade. There is "
+                  "no entry rule, no stop, no size and no cost here, and the gap "
+                  "between the two is every part of trading that is hard.[/dim]")
+
+
+@app.command()
 def sessions(limit: int = typer.Option(20, help="How many to list.")) -> None:
     """What is in the archive."""
     from tradesights import store

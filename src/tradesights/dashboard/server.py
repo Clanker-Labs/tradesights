@@ -23,6 +23,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from tradesights import store
+from tradesights.core import analytics, backtest
 from tradesights.core.model import QUADRANT_PLAIN, QUADRANT_SHORT, Quadrant
 
 logger = logging.getLogger(__name__)
@@ -117,6 +118,143 @@ def api_name(symbol: str) -> dict:
         "sessions": len(rows),
         "streak": streak,
         "history": [_observation(r) for r in rows],
+    }
+
+
+@app.get("/api/backtest")
+def api_backtest(horizon: int = Query(5, ge=1, le=60)) -> dict:
+    """What acting on the signals would have meant.
+
+    Separate endpoint from /api/resolve rather than more fields on it, because
+    they answer different questions and conflating them is how a "did the price
+    move" number gets read as a P&L. resolve is direction-blind by design; this
+    takes a side, and the side is an interpretation laid on the tool rather than
+    something the tool claims. See core/backtest.DIRECTION.
+    """
+    outcomes = store.resolve(horizon)
+    board = backtest.run(outcomes, horizon_days=horizon)
+    corr = backtest.correlate_divergence(board)
+
+    per_symbol: dict[str, dict] = {}
+    for t in board.trades:
+        d = per_symbol.setdefault(t.symbol, {"symbol": t.symbol, "n": 0, "wins": 0, "total": 0.0})
+        d["n"] += 1
+        d["wins"] += 1 if t.won else 0
+        d["total"] += t.pnl_return
+    ranked = sorted(per_symbol.values(), key=lambda d: d["total"], reverse=True)
+
+    return {
+        "horizon_days": horizon,
+        "resolved": len(outcomes),
+        "traded": board.n,
+        "stood_aside": board.stood_aside,
+        "wins": board.wins,
+        "losses": board.losses,
+        "hit_rate": board.hit_rate,
+        "mean_return": board.mean_return,
+        "total_return": board.total_return,
+        # Always travels with the headline. Every strategy looks brilliant in a
+        # month when everything went up.
+        "baseline_return": board.baseline_return,
+        "edge": board.edge,
+        "best": _trade(board.best),
+        "worst": _trade(board.worst),
+        "curve": backtest.equity_curve(board),
+        "by_symbol": ranked,
+        "trades": [_trade(t) for t in board.trades],
+        "correlation": {
+            "n": corr.n, "r": corr.r, "rho": corr.rho,
+            "hit_trend": corr.hit_trend, "buckets": corr.buckets,
+            "note": corr.note, "reportable": corr.reportable,
+        },
+        "direction": {k: v for k, v in backtest.DIRECTION.items()},
+    }
+
+
+@app.get("/api/analytics")
+def api_analytics(horizon: int = Query(5, ge=1, le=60),
+                  shuffles: int = Query(200, ge=50, le=2000)) -> dict:
+    """Why the winners won — and whether that reason survives contact with noise.
+
+    The filter search is the dangerous half of this endpoint and the permutation
+    test is why it is safe to expose. Shuffling which trades won destroys any
+    real relationship while preserving the sample size, the factor distributions
+    and the search itself, so whatever the search finds on shuffled data is
+    exactly what it can manufacture from nothing. The p-value that falls out is
+    served alongside the rule, never behind a flag, because a rule without it is
+    the single most dangerous number this tool could publish.
+    """
+    board = backtest.run(store.resolve(horizon), horizon_days=horizon)
+    risk = analytics.risk_metrics(board)
+    factors = analytics.factor_reports(board)
+    study = analytics.filter_study(board, shuffles=shuffles)
+
+    return {
+        "horizon_days": horizon,
+        "risk": {
+            "n": risk.n, "avg_win": risk.avg_win, "avg_loss": risk.avg_loss,
+            "payoff_ratio": risk.payoff_ratio, "profit_factor": risk.profit_factor,
+            "expectancy": risk.expectancy,
+            "return_per_unit_risk": risk.return_per_unit_risk,
+            "max_drawdown": risk.max_drawdown,
+            "max_losing_streak": risk.max_losing_streak,
+            "top_trade_share": risk.top_trade_share,
+        },
+        "factors": [
+            {"name": f.name, "n": f.n, "ic": f.ic,
+             "winner_mean": f.winner_mean, "loser_mean": f.loser_mean,
+             "separation": f.separation, "quartiles": f.quartiles, "note": f.note}
+            for f in factors
+        ],
+        "filters": {
+            "baseline_mean": study.baseline_mean, "baseline_n": study.baseline_n,
+            "tried": study.tried, "p_value": study.p_value,
+            "verdict": study.verdict,
+            "best": (None if study.best is None else {
+                "factor": study.best.factor, "op": study.best.op,
+                "threshold": study.best.threshold, "n": study.best.n,
+                "hit_rate": study.best.hit_rate, "mean_return": study.best.mean_return,
+                "lift": study.best.lift}),
+            "rules": [{"factor": r.factor, "op": r.op, "threshold": r.threshold,
+                       "n": r.n, "hit_rate": r.hit_rate,
+                       "mean_return": r.mean_return, "lift": r.lift}
+                      for r in study.rules],
+            "null_best": study.null_best,
+        },
+    }
+
+
+@app.get("/api/backtest/{symbol}")
+def api_backtest_symbol(symbol: str, horizon: int = Query(5, ge=1, le=60)) -> dict:
+    """One name's price line, with every signal marked on it.
+
+    The series and the marks come from the same archive rows, so a mark always
+    lands ON the line. Deriving the mark's y-value from a date lookup against a
+    separately fetched series is how a chart ends up with alerts floating beside
+    the price they were supposedly triggered at.
+    """
+    rows = store.history(symbol.upper())
+    if not rows:
+        raise HTTPException(status_code=404, detail=f"no history for {symbol.upper()}")
+    board = backtest.run(store.resolve(horizon), horizon_days=horizon)
+    return {
+        "symbol": symbol.upper(),
+        "horizon_days": horizon,
+        "series": [{"session": r.session, "price": r.price,
+                    "quadrant": r.quadrant, "divergence": r.divergence}
+                   for r in rows if r.price > 0],
+        "marks": backtest.marks_for(symbol.upper(), board),
+    }
+
+
+def _trade(t) -> dict | None:
+    if t is None:
+        return None
+    return {
+        "symbol": t.symbol, "session": t.session, "quadrant": t.quadrant,
+        "direction": t.direction, "divergence": t.divergence,
+        "entry_price": t.entry_price, "exit_price": t.exit_price,
+        "price_return": t.price_return, "pnl_return": t.pnl_return, "won": t.won,
     }
 
 
